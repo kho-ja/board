@@ -31,7 +31,9 @@
 - **Q1.10** Exact File-Group-deletion cascade spec: iterate members, check each for
   other references (other groups or standalone placement), unplace if none.
 - **Q1.11** ID generation strategy for future persistence/sync (UUID v7 vs nanoid vs
-  custom).
+  custom). **Resolved (M4-preparation):** keep `crypto.randomUUID()` per insert — the
+  existing pattern in `src/routes/demo/m2.tsx:60`. Revisit UUID v7 only if
+  sync/concurrency lands (M5+).
 
 ## 2. Rendering / Canvas Engine
 
@@ -59,7 +61,11 @@
 - **Q2.8** File Group block sizing across card/list/grid views (does block resize on
   view switch?).
 - **Q2.9** Drop target for "paste files into a File Group" (OS drag onto group block vs
-  panel selection vs menu action).
+  panel selection vs menu action). **Resolved (M4-preparation, partial):** M4 wires file
+  import at the **canvas** level — a native `<input type="file" multiple>` picker + a
+  drop zone on the whole canvas viewport reading `dataTransfer.files` → one `file` block
+  + cascade placement per file. Drop-*onto-a-File-Group* stays open (M6) but reuses the
+  same drop mechanics built here.
 - **Q2.10** Does the viewport/culling architecture accommodate a future minimap /
   zoom-to-fit?
 
@@ -119,6 +125,37 @@
 - **Q6.6** React 19 features to use (`useOptimistic`, `useTransition`) vs keep simple.
 - **Q6.7** Vite 8 config / breaking changes.
 - **Q6.8** Basic client-side smoke test / CI gate.
+
+## 7. M4 — File blocks + paste (surfaced during M4-preparation research)
+
+- **Q-M4.1** Where the hidden `<input type="file" multiple>` lives. **Resolved
+  (M4-preparation):** for M4, co-locate it in the demo route — a small
+  `src/components/canvas/FileImport.tsx` (button + hidden input + `onChange`) calling a
+  shared `importFiles(files: File[])` handler in `src/routes/demo/m2.tsx`. Promote to a
+  reusable `useFilePicker` hook only when a second consumer appears (M6 group-drop).
+- **Q-M4.2** Drop-zone vs paste button vs both. **Resolved (M4-preparation):** both —
+  a visible "Paste files" button (discoverable, keyboard/mobile-friendly) **and** a
+  whole-canvas drop zone catching `dataTransfer.files` (the natural "paste"), both
+  funnelling into the same `importFiles` helper. Requires `preventDefault()` on
+  `dragover` (else no `drop` fires) plus a drag-over highlight class on the viewport.
+- **Q-M4.3** Auto-place cascade layout. **Resolved (M4-preparation):** auto-place every
+  file (GRILL 49 — pasted files land on the canvas). Anchor = the drop point
+  (`screenToWorld(clientX - rect.left, clientY - rect.top)` of the canvas viewport) for
+  drops; the m2 `(80, 80)` screen-point anchor for the button path. Cascade
+  `col = index % 5`, `row = floor(index / 5)`, `GRID_SPACING = 70` — reuse the existing
+  pattern at `src/routes/demo/m2.tsx:245-256`.
+- **Q-M4.4** The row's `kind` column and `data.kind` are **not** cross-validated
+  (`BlockSchema` keeps `kind: z.string()` independent of `data` —
+  `src/types/schemas.ts:41-49`; `blockTitle` at `src/components/canvas/BlockShell.tsx:33`
+  switches on the row `kind`). **Resolved (M4-preparation):** build M4 inserts through a
+  small `makeFileBlock(file)` helper that sets both `kind` and `data.kind` to `'file'`;
+  add a `BlockSchema.superRefine()` asserting `kind === data.kind` as follow-up hardening
+  (M3/M8), not a blocker.
+- **Q-M4.5** File block rendering inside `BlockShell`. **Resolved (M4-preparation):** add
+  a minimal `src/blocks/file/FileCard.tsx` (file name + formatted size + mimeType
+  sub-line) and render it from the `'file'` case of the `BlockRenderer` switch that M3
+  introduces — seeds the fuller per-type renderer; the generic `blockTitle` line remains
+  the fallback.
 
 ## Highest-priority before coding
 
