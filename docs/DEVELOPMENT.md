@@ -1,9 +1,9 @@
 # Development
 
-> Status: **M0 and M1 complete.** TanStack Start scaffold is in place and the
-> Postgres data path (server functions → Drizzle → Postgres, reactive
-> QueryCollections) is verified end-to-end. Milestones use the checklist below
-> (`npm run lint`, `npm run build`, `npm run dev`, Postgres `db:push`).
+> Status: **M0, M1 and M2 complete.** Starting from **M3** (text block render +
+> in-place edit on the M2 canvas). TanStack Start scaffold, the Postgres data path
+> (server functions → Drizzle → Postgres, reactive QueryCollections), and the
+> pan/zoom/drag infinite canvas are all verified end-to-end.
 
 ## Prerequisites
 

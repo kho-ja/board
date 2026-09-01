@@ -37,9 +37,15 @@
 
 - **Q2.1** Canvas layer architecture: single transform `<div>` + overlay `<canvas>`
   for grid/edges/selection, or two sibling containers sharing viewport state?
+  **Resolved (M2): single transformed `<div>` for the world (blocks); the dot grid
+  is a CSS radial-gradient background on the same world div. (No separate canvas
+  overlay yet — revisit for edges/selection.)**
 - **Q2.2** Viewport culling implementation: `useMemo` filter vs `IntersectionObserver`
-  vs virtual list; culling margin.
-- **Q2.3** Background grid: Canvas API vs CSS pattern.
+  vs virtual list; culling margin. **Resolved (M2): `useMemo` filter against a
+  computed visible world rect, with a `CULL_MARGIN` (160px).**
+- **Q2.3** Background grid: Canvas API vs CSS pattern. **Resolved (M2): CSS
+  `radial-gradient` dot pattern (tiled 24px) on the world div — scales with the
+  world, no JS cost.**
 - **Q2.4** Link rendering: SVG overlay (simpler, pointer-events work) vs Canvas API
   (consistent with grid, but needs manual hit-testing).
 - **Q2.5** Block size model: fixed per type, auto-height from content, or resizable?
@@ -48,6 +54,8 @@
   group")?
 - **Q2.7** `text` rich-text editor: textarea + markdown, contentEditable + manual
   parse, or a library (Tiptap/Milkdown/Lexical)? "Generic edit path for v1."
+  **M3 will use a plain `textarea` + a hand-rolled markdown-subset renderer
+  (per START_PLAN §M3) — open to revisiting for richer editing later.**
 - **Q2.8** File Group block sizing across card/list/grid views (does block resize on
   view switch?).
 - **Q2.9** Drop target for "paste files into a File Group" (OS drag onto group block vs

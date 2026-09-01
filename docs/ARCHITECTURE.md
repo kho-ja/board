@@ -1,9 +1,9 @@
 # Architecture
 
-> Status: **M0 + M1 implemented.** TanStack Start scaffold + the Postgres data
-> path are in place and verified (M1): Drizzle tables, server-only query layer,
-> `createServerFn` wrappers, and TanStack DB QueryCollections. Notes below now
-> describe the running system; M2 (infinite canvas) builds on it per START_PLAN.md.
+> Status: **M0 + M1 + M2 implemented.** TanStack Start scaffold, the Postgres data
+> path, and the pan/zoom/drag infinite canvas are in place and verified. Notes
+> below now describe the running system; M3 (text block + in-place edit) builds on
+> it per START_PLAN.md.
 
 ## Current state
 
@@ -15,6 +15,11 @@
   (`src/db/queries.functions.ts`); per-table QueryCollections
   (`src/collections/*`). Reading via `useLiveQuery`, mutations are optimistic and
   persist to Postgres on reload.
+- M2 infinite canvas complete and verified: `src/lib/canvas/transform.ts`
+  (world/screen math, culling), `ViewportProvider`/`useViewport`,
+  `usePanZoom` (hot path in refs + rAF direct-DOM writes, cold commit on gesture
+  end), `Canvas` (dot-grid world div + transformed container), `BlockShell`
+  (pointer-capture drag). Demo at `src/routes/demo/m2.tsx`.
 - The documentation is the source of truth for the roadmap: see ROADMAP.md (scope)
   and DECISIONS.md + DESIGN.md (decisions and the core knowledge-model design).
 

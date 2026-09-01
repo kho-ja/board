@@ -21,6 +21,14 @@ things are done before they are done.
   (live queries + optimistic mutations); ESLint toolchain added; verified
   seed → `useLiveQuery`, optimistic update → Postgres, persistence across reload.
   See START_PLAN.md §M1.
+- **M2 — Infinite canvas with pan/zoom + free-floating draggable blocks:**
+  `transform.ts` (world/screen math + culling), `ViewportProvider`/`useViewport`,
+  `usePanZoom` (hot path in refs + rAF direct-DOM writes, cold commit on gesture
+  end), `Canvas` (dot grid + transformed world div), `BlockShell` (pointer-capture
+  drag, scaled world delta). Blocks read from `blocks`/`placements` collections;
+  drag-end commits position to Postgres; off-viewport blocks are culled. Verified:
+  pan, zoom (wheel + buttons), drag, culling (2/3 visible), persistence across
+  reload. See START_PLAN.md §M2 and `src/routes/demo/m2.tsx`.
 
 ## In progress
 
@@ -32,23 +40,25 @@ things are done before they are done.
 
 ## Next (in rough order)
 
-0. **M2 — Infinite canvas with pan/zoom + one free-floating draggable block**
-   (top of the current milestone queue): `transform.ts`, `ViewportContext`,
-   `usePanZoom`, `Canvas` (dot grid + transform div), `BlockShell`; blocks read
-   from the `blocks`/`placements` collections; drag-end commits position; verify
-   pan/zoom/drag + persistence. See START_PLAN.md §M2.
+0. **M3 — Text block (render + in-place edit).** `TextBlockData { markdown }`;
+   hand-rolled markdown-subset parser; double-click editor; `BlockRenderer`
+   switch; update round-trips to the server fn / Postgres (block-editing path on
+   the M2 canvas). Verify: dbl-click → edit → Escape → formatted render; persists.
+   See START_PLAN.md §M3.
 
-1. **The generic schema system** — block types defined by composed fields (with
+1. **M4 — File blocks + paste (drag-drop + hidden input).** See START_PLAN.md §M4.
+
+2. **The generic schema system** — block types defined by composed fields (with
    `file` / `file-group` as the first preset types), rendered on a pan/zoom canvas
    (in-memory). **Milestone = model + reference grouping, not just dragging:** paste
    file **references** → group them into a File Group → switch card/list view.
    (Per DECISIONS.md, v1 files are references/metadata only — no real preview yet.)
-2. **v1 relationships** — simple "link with a line" between blocks, plus **group
+3. **v1 relationships** — simple "link with a line" between blocks, plus **group
    membership** made by pasting files into a File Group (a File Group renders its
    members as card/list per view). Many-to-many: a file can belong to multiple
    groups.
-3. Save/load of the canvas layout (see OQ-13 schema versioning).
-4. The side-panel / asset library, and how group membership is stored (OQ-10).
+4. Save/load of the canvas layout (see OQ-13 schema versioning).
+5. The side-panel / asset library, and how group membership is stored (OQ-10).
 
 > **Typed connections** (`depends-on`, `responsible-for`, `part-of`, `related-to`)
 > are consciously **deferred out of v1** — they become an optional power feature
