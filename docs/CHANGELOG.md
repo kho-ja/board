@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-09-01 — M2 complete (infinite pan/zoom/drag canvas)
+
+- **M2 — Infinite canvas with pan/zoom + free-floating draggable blocks** (per
+  START_PLAN.md §M2), verified end-to-end in the browser:
+  - `src/lib/canvas/transform.ts`: world↔screen math (`worldToScreen`,
+    `screenToWorld`, `matrix`), pan/zoom-at-cursor, viewport culling
+    (`visibleWorldRect`, `rectsOverlap`), scale clamping.
+  - `src/components/canvas/ViewportProvider.tsx` (`useViewport`) holds the
+    viewport transform as React state (cold); `usePanZoom` keeps the hot path
+    (pan/zoom frames) in refs + `requestAnimationFrame` direct-DOM writes and
+    commits to state on gesture end (per the locked rendering direction).
+  - `Canvas.tsx`: dot-grid world container inside a transformed viewport div;
+    blocks only translate via the container transform (no per-frame block
+    re-render). Off-viewport blocks are culled.
+  - `BlockShell.tsx`: pointer-capture drag in world coordinates (scaled by the
+    viewport), commits the new `position_x/y` to the `placements` collection on
+    drag-end → server fn → Postgres.
+  - `src/routes/demo/m2.tsx`: canvas demo — add/place/drag text blocks, pan, zoom
+    (wheel + buttons), viewport HUD, unplaced-blocks panel.
+  - Verified: pan (via pointer), zoom (wheel + buttons), drag (+100/+60),
+    culling (2/3 placed visible), and **position persists across reload**
+    (DB-confirmed `position_x=250, position_y=140`).
+- Found usages are docs-first and follow the plan's file layout
+  (`src/lib/canvas/*`, `src/components/canvas/*`).
+- **Docs:** ROADMAP/DEVELOPMENT/ARCHITECTURE updated for M2 completion.
+
 ## 2026-09-01 — M0 + M1 complete (TanStack Start + Postgres data path)
 
 - **M0 — Scaffold.** Migrated to the full-send TanStack Start structure
