@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "tanstack": {
+        "type": "local",
+        "command": ["npx", "-y", "@g7aro/tanstack-mcp"],
+        "environment": {
+          "TANSTACK_API_KEY": "{env:TANSTACK_API_KEY}"
+        }
+      }
+    }
+  }
+}
