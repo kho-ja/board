@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-09-02 — Product-route cleanup
+
+- Promoted the working canvas from `/demo/m2` to the root `/` route.
+- Removed the default Start home/about pages, sample Query/Drizzle/chat/M1 routes,
+  their supporting components and hooks, starter header/footer, and sample asset.
+- Replaced the starter README and favicon with Kho-ja project equivalents.
+- Removed unused Typography/tsx development dependencies and pruned demo-only CSS.
+
+## 2026-09-01 — M3 complete (text block render + in-place edit)
+
+- Added `BlockRenderer` and a text-block view/editor on the infinite canvas.
+- Added safe `@tanstack/markdown/react` rendering for headings, lists, bold,
+  `*italic*` / `_italic_`, inline code, and the library's wider syntax profile.
+- Text blocks enter edit mode on double-click. Enter commits through the existing
+  TanStack DB collection → server function → Postgres path; Escape or blur cancels.
+- Removed the renderer/shell runtime import cycle and kept non-text rendering behind
+  the renderer switch for the next block kinds.
+- Verified in the browser: formatted render, deterministic Escape cancellation,
+  Enter persistence across a full reload, and restoration of the original test data.
+  `npm run lint` and `npm run build` pass.
+
 ## 2026-09-01 — M2 complete (infinite pan/zoom/drag canvas)
 
 - **M2 — Infinite canvas with pan/zoom + free-floating draggable blocks** (per
@@ -182,4 +203,3 @@ finalize the core design (DESIGN.md) and decisions before writing real code.
   - Artifacts: `docs/START_PLAN.md` (full-stack) and `docs/BUILD_QUESTIONS.md`
     (build-time questions for the original SPA framing — still useful for the model
     engine and canvas layers).
-

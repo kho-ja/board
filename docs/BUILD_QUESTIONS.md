@@ -32,7 +32,7 @@
   other references (other groups or standalone placement), unplace if none.
 - **Q1.11** ID generation strategy for future persistence/sync (UUID v7 vs nanoid vs
   custom). **Resolved (M4-preparation):** keep `crypto.randomUUID()` per insert — the
-  existing pattern in `src/routes/demo/m2.tsx:60`. Revisit UUID v7 only if
+  existing pattern in `src/routes/index.tsx`. Revisit UUID v7 only if
   sync/concurrency lands (M5+).
 
 ## 2. Rendering / Canvas Engine
@@ -56,8 +56,8 @@
   group")?
 - **Q2.7** `text` rich-text editor: textarea + markdown, contentEditable + manual
   parse, or a library (Tiptap/Milkdown/Lexical)? "Generic edit path for v1."
-  **M3 will use a plain `textarea` + a hand-rolled markdown-subset renderer
-  (per START_PLAN §M3) — open to revisiting for richer editing later.**
+  **M3 uses a plain `textarea` + `@tanstack/markdown/react` (superseding the
+  original hand-rolled renderer plan) — open to revisiting the editor later.**
 - **Q2.8** File Group block sizing across card/list/grid views (does block resize on
   view switch?).
 - **Q2.9** Drop target for "paste files into a File Group" (OS drag onto group block vs
@@ -129,9 +129,9 @@
 ## 7. M4 — File blocks + paste (surfaced during M4-preparation research)
 
 - **Q-M4.1** Where the hidden `<input type="file" multiple>` lives. **Resolved
-  (M4-preparation):** for M4, co-locate it in the demo route — a small
+  (M4-preparation):** for M4, co-locate it in the board route — a small
   `src/components/canvas/FileImport.tsx` (button + hidden input + `onChange`) calling a
-  shared `importFiles(files: File[])` handler in `src/routes/demo/m2.tsx`. Promote to a
+  shared `importFiles(files: File[])` handler in `src/routes/index.tsx`. Promote to a
   reusable `useFilePicker` hook only when a second consumer appears (M6 group-drop).
 - **Q-M4.2** Drop-zone vs paste button vs both. **Resolved (M4-preparation):** both —
   a visible "Paste files" button (discoverable, keyboard/mobile-friendly) **and** a
@@ -143,7 +143,7 @@
   (`screenToWorld(clientX - rect.left, clientY - rect.top)` of the canvas viewport) for
   drops; the m2 `(80, 80)` screen-point anchor for the button path. Cascade
   `col = index % 5`, `row = floor(index / 5)`, `GRID_SPACING = 70` — reuse the existing
-  pattern at `src/routes/demo/m2.tsx:245-256`.
+  pattern in `src/routes/index.tsx`.
 - **Q-M4.4** The row's `kind` column and `data.kind` are **not** cross-validated
   (`BlockSchema` keeps `kind: z.string()` independent of `data` —
   `src/types/schemas.ts:41-49`; `blockTitle` at `src/components/canvas/BlockShell.tsx:33`

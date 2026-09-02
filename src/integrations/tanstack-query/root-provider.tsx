@@ -12,4 +12,3 @@ export function getContext() {
     collections,
   }
 }
-export default function TanstackQueryProvider() {}

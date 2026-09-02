@@ -1,7 +1,7 @@
 # Development
 
-> Status: **M0, M1 and M2 complete.** Starting from **M3** (text block render +
-> in-place edit on the M2 canvas). TanStack Start scaffold, the Postgres data path
+> Status: **M0–M3 complete.** Starting from **M4** (file blocks + paste). TanStack
+> Start scaffold, the Postgres data path
 > (server functions → Drizzle → Postgres, reactive QueryCollections), and the
 > pan/zoom/drag infinite canvas are all verified end-to-end.
 
