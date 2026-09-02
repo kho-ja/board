@@ -5,6 +5,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { BlockShell } from '#/components/canvas/BlockShell'
 import type {
   ObservableBlock,
+  ObservableMembership,
   ObservablePlacement,
 } from '#/components/canvas/BlockShell'
 import { Canvas } from '#/components/canvas/Canvas'
@@ -26,7 +27,7 @@ import {
   zoomAt,
 } from '#/lib/canvas/transform'
 import type { Vec, WorldRect } from '#/lib/canvas/transform'
-import type { TextBlockData } from '#/types'
+import type { FileGroupBlockData, TextBlockData } from '#/types'
 import type { Collections } from '#/collections'
 
 export const Route = createFileRoute('/')({
@@ -35,6 +36,7 @@ export const Route = createFileRoute('/')({
     await Promise.all([
       context.collections.blocksCollection.preload(),
       context.collections.placementsCollection.preload(),
+      context.collections.membershipsCollection.preload(),
     ])
     return null
   },
@@ -43,8 +45,15 @@ export const Route = createFileRoute('/')({
 
 const BLOCK_WIDTH = 180
 const BLOCK_HEIGHT = 92
+const GROUP_WIDTH = 280
+const GROUP_HEIGHT = 220
 const GRID_SPACING = 70
 const DEFAULT_TEXT = 'Text'
+
+const sizeForBlock = (kind: string) =>
+  kind === 'file-group'
+    ? { width: GROUP_WIDTH, height: GROUP_HEIGHT }
+    : { width: BLOCK_WIDTH, height: BLOCK_HEIGHT }
 
 function BoardPage() {
   const collections = Route.useRouteContext({
@@ -59,6 +68,10 @@ function BoardPage() {
     query: (q) => q.from({ placement: collections.placementsCollection }),
   })
 
+  const { data: memberships } = useLiveQuery({
+    query: (q) => q.from({ membership: collections.membershipsCollection }),
+  })
+
   const placedIds = useMemo(() => new Set(placements.map((p) => p.blockId)), [placements])
   const unplaced = useMemo(
     () => blocks.filter((block) => !placedIds.has(block.id)),
@@ -70,6 +83,7 @@ function BoardPage() {
       <Board
         blocks={blocks}
         placements={placements}
+        memberships={memberships}
         unplaced={unplaced}
         collections={collections}
       />
@@ -80,11 +94,12 @@ function BoardPage() {
 interface BoardProps {
   blocks: ObservableBlock[]
   placements: ObservablePlacement[]
+  memberships: ObservableMembership[]
   unplaced: ObservableBlock[]
   collections: Collections
 }
 
-function Board({ blocks, placements, unplaced, collections }: BoardProps) {
+function Board({ blocks, placements, memberships, unplaced, collections }: BoardProps) {
   const { ref: containerRef, width, height } = useElementSize<HTMLDivElement>()
   const { viewport, setViewport } = useViewport()
   const [tool, setTool] = useState<Tool>('move')
@@ -106,19 +121,31 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
           !!entry.block,
       )
     if (!visibleRect) return placed
-    return placed.filter(({ placement }) =>
+    return placed.filter(({ placement, block }) =>
       rectsOverlap(
         visibleRect,
         rectFromWorldPoint(
           { x: placement.positionX, y: placement.positionY },
-          BLOCK_WIDTH,
-          BLOCK_HEIGHT,
+          sizeForBlock(block.kind).width,
+          sizeForBlock(block.kind).height,
         ),
       ),
     )
   }, [blocks, placements, visibleRect])
 
   const byId = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks])
+
+  const membersByGroup = useMemo(() => {
+    const map = new Map<string, ObservableBlock[]>()
+    for (const membership of memberships) {
+      const member = byId.get(membership.memberId)
+      if (!member) continue
+      const list = map.get(membership.groupId)
+      if (list) list.push(member)
+      else map.set(membership.groupId, [member])
+    }
+    return map
+  }, [byId, memberships])
   const selectedBlocks = useMemo(
     () =>
       placements
@@ -204,12 +231,13 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
 
   const placeAt = (blockId: string, index: number) => {
     const origin = viewCenter()
+    const size = sizeForBlock(byId.get(blockId)?.kind ?? '')
     const col = index % 5
     const row = Math.floor(index / 5)
     collections.placementsCollection.insert({
       blockId,
-      positionX: Math.round(origin.x - BLOCK_WIDTH / 2 + col * GRID_SPACING),
-      positionY: Math.round(origin.y - BLOCK_HEIGHT / 2 + row * GRID_SPACING),
+      positionX: Math.round(origin.x - size.width / 2 + col * GRID_SPACING),
+      positionY: Math.round(origin.y - size.height / 2 + row * GRID_SPACING),
     })
     setSelectedIds(new Set([blockId]))
     setTool('move')
@@ -221,8 +249,9 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   // Each file's placement is inserted only after its block row has committed
   // (await) so the placements FK never races the blocks write.
   const importFiles = useCallback(
-    async (files: File[], anchor: Vec) => {
+    async (files: File[], anchor: Vec, intoGroup?: string | null) => {
       let firstId: string | null = null
+      const created: string[] = []
       for (let index = 0; index < files.length; index++) {
         const id = crypto.randomUUID()
         const col = index % 5
@@ -238,11 +267,30 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
           positionX: Math.round(anchor.x - BLOCK_WIDTH / 2 + col * GRID_SPACING),
           positionY: Math.round(anchor.y - BLOCK_HEIGHT / 2 + row * GRID_SPACING),
         })
+        created.push(id)
         if (firstId === null) firstId = id
       }
-      if (firstId !== null) setSelectedIds(new Set([firstId]))
+      if (intoGroup) {
+        // Membership rows reference already-committed file blocks (awaited
+        // above), so the membership FK cannot race. Files dropped into a group
+        // keep their own placements; the membership is an extra reference.
+        const already = new Set(
+          memberships.filter((m) => m.groupId === intoGroup).map((m) => m.memberId),
+        )
+        for (const memberId of created) {
+          if (already.has(memberId)) continue
+          already.add(memberId)
+          collections.membershipsCollection.insert({
+            id: crypto.randomUUID(),
+            groupId: intoGroup,
+            memberId,
+          })
+        }
+      } else if (firstId !== null) {
+        setSelectedIds(new Set([firstId]))
+      }
     },
-    [collections],
+    [collections, memberships],
   )
 
   const pickFiles = useCallback(
@@ -255,6 +303,93 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   const onImportFiles = useCallback(
     (files: File[], anchor: Vec) => importFiles(files, anchor),
     [importFiles],
+  )
+
+  const createGroup = useCallback(async () => {
+    const id = crypto.randomUUID()
+    const tx = collections.blocksCollection.insert({
+      id,
+      kind: 'file-group',
+      data: {
+        kind: 'file-group',
+        name: 'File Group',
+        currentView: 'card',
+      } satisfies FileGroupBlockData,
+      schemaVersion: '1',
+    })
+    await tx.isPersisted.promise
+    const origin = viewCenter()
+    collections.placementsCollection.insert({
+      blockId: id,
+      positionX: Math.round(origin.x - GROUP_WIDTH / 2),
+      positionY: Math.round(origin.y - GROUP_HEIGHT / 2),
+    })
+    setTool('move')
+    setSelectedIds(new Set([id]))
+  }, [collections, viewCenter])
+
+  const handleDropFilesOnGroup = useCallback(
+    (groupId: string, files: File[], dropPoint: Vec) => {
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const anchor = screenToWorld(viewport, {
+        x: dropPoint.x - rect.left,
+        y: dropPoint.y - rect.top,
+      })
+      void importFiles(files, anchor, groupId)
+    },
+    [containerRef, importFiles, viewport],
+  )
+
+  const handleGroupViewChange = useCallback(
+    (blockId: string, view: 'card' | 'list') => {
+      collections.blocksCollection.update(blockId, (draft) => {
+        const data = draft.data as FileGroupBlockData
+        draft.data = { kind: 'file-group', name: data.name, currentView: view }
+      })
+    },
+    [collections],
+  )
+
+  const handleRenameGroup = useCallback(
+    (blockId: string, name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      collections.blocksCollection.update(blockId, (draft) => {
+        const data = draft.data as FileGroupBlockData
+        draft.data = { kind: 'file-group', name: trimmed, currentView: data.currentView }
+      })
+    },
+    [collections],
+  )
+
+  const handleUnplace = useCallback(
+    (blockId: string) => {
+      collections.placementsCollection.delete(blockId)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(blockId)
+        return next
+      })
+    },
+    [collections],
+  )
+
+  const handleDeleteGroup = useCallback(
+    (groupId: string) => {
+      for (const membership of memberships) {
+        if (membership.groupId === groupId) {
+          collections.membershipsCollection.delete(membership.id)
+        }
+      }
+      collections.placementsCollection.delete(groupId)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(groupId)
+        return next
+      })
+    },
+    [collections, memberships],
   )
 
   const zoomAtCenter = (factor: number) => {
@@ -320,14 +455,15 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
       }
       const next = new Set<string>()
       for (const placement of placements) {
-        if (!byId.has(placement.blockId)) continue
+        const block = byId.get(placement.blockId)
+        if (!block) continue
         if (
           rectsOverlap(
             world,
             rectFromWorldPoint(
               { x: placement.positionX, y: placement.positionY },
-              BLOCK_WIDTH,
-              BLOCK_HEIGHT,
+              sizeForBlock(block.kind).width,
+              sizeForBlock(block.kind).height,
             ),
           )
         ) {
@@ -341,7 +477,10 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
 
   return (
     <div className="board-shell">
-      <TopBar onPickFiles={pickFiles} />
+      <TopBar
+        onPickFiles={pickFiles}
+        onCreateGroup={() => void createGroup()}
+      />
       <div className="board-main">
         <ToolRail tool={tool} onSelect={setTool} />
         <LeftDock
@@ -377,6 +516,10 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
                 onSelect={selectOnly}
                 onToggleSelect={toggleSelect}
                 selected={selectedIds.has(block.id)}
+                members={membersByGroup.get(block.id)}
+                onGroupViewChange={handleGroupViewChange}
+                onMemberClick={selectOnly}
+                onDropFilesOnGroup={handleDropFilesOnGroup}
               />
             ))}
           </Canvas>
@@ -384,6 +527,10 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
         <Inspector
           selected={selectedBlocks}
           onUpdatePosition={handleUpdatePosition}
+          onUnplace={handleUnplace}
+          onDeleteGroup={handleDeleteGroup}
+          onRenameGroup={handleRenameGroup}
+          membersByGroup={membersByGroup}
         />
       </div>
       <StatusBar

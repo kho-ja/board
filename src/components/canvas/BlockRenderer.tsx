@@ -1,3 +1,4 @@
+import { FileGroupBlock } from '#/blocks/file-group/FileGroupBlock'
 import { FileCard } from '#/blocks/file/FileCard'
 import { TextBlockView } from '#/blocks/text/TextBlock'
 import type {
@@ -21,12 +22,34 @@ export function blockTitle(block: ObservableBlock): string {
   }
 }
 
-export function BlockRenderer({ block }: { block: ObservableBlock }) {
+interface BlockRendererProps {
+  block: ObservableBlock
+  members?: ObservableBlock[]
+  onGroupViewChange?: (view: 'card' | 'list') => void
+  onMemberClick?: (blockId: string) => void
+}
+
+export function BlockRenderer({
+  block,
+  members = [],
+  onGroupViewChange,
+  onMemberClick,
+}: BlockRendererProps) {
   if (block.kind === 'text') {
     return <TextBlockView data={block.data as TextBlockData} />
   }
   if (block.kind === 'file') {
     return <FileCard data={block.data as FileBlockData} />
+  }
+  if (block.kind === 'file-group') {
+    return (
+      <FileGroupBlock
+        data={block.data as FileGroupBlockData}
+        members={members}
+        onViewChange={onGroupViewChange}
+        onMemberClick={onMemberClick}
+      />
+    )
   }
   return <p className="block-title">{blockTitle(block)}</p>
 }

@@ -11,7 +11,7 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(digits)} ${units[index]}`
 }
 
-const FILE_ICON = (
+export const FILE_ICON = (
   <svg
     className="file-card-icon"
     viewBox="0 0 16 16"

@@ -1,18 +1,30 @@
 import { useEffect, useState } from 'react'
 
+import type { FileGroupBlockData } from '#/types'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
 interface InspectorProps {
   selected: { block: ObservableBlock; placement: ObservablePlacement | null }[]
   onUpdatePosition: (blockId: string, x: number, y: number) => void
+  onUnplace?: (blockId: string) => void
+  onDeleteGroup?: (groupId: string) => void
+  onRenameGroup?: (blockId: string, name: string) => void
+  membersByGroup?: ReadonlyMap<string, ObservableBlock[]>
 }
 
 function round(v: number): string {
   return String(Math.round(v * 100) / 100)
 }
 
-export function Inspector({ selected, onUpdatePosition }: InspectorProps) {
+export function Inspector({
+  selected,
+  onUpdatePosition,
+  onUnplace,
+  onDeleteGroup,
+  onRenameGroup,
+  membersByGroup,
+}: InspectorProps) {
   if (selected.length === 0) {
     return (
       <aside className="inspector">
@@ -47,6 +59,9 @@ export function Inspector({ selected, onUpdatePosition }: InspectorProps) {
   }
 
   const { block, placement } = selected[0]
+  const isGroup = block.kind === 'file-group'
+  const groupData = isGroup ? (block.data as FileGroupBlockData) : null
+  const memberCount = isGroup ? (membersByGroup?.get(block.id)?.length ?? 0) : 0
 
   return (
     <aside className="inspector">
@@ -54,6 +69,15 @@ export function Inspector({ selected, onUpdatePosition }: InspectorProps) {
         <span className="inspector-kind">{block.kind}</span>
         <h2 className="inspector-title">{blockTitle(block)}</h2>
       </div>
+
+      {isGroup && groupData && (
+        <GroupPanel
+          blockId={block.id}
+          name={groupData.name}
+          memberCount={memberCount}
+          onRenameGroup={onRenameGroup}
+        />
+      )}
 
       {placement && (
         <PositionField
@@ -73,7 +97,102 @@ export function Inspector({ selected, onUpdatePosition }: InspectorProps) {
           <dd>v{block.schemaVersion}</dd>
         </div>
       </dl>
+
+      <div className="inspector-actions">
+        {placement && onUnplace && (
+          <button
+            type="button"
+            className="inspector-btn"
+            onClick={() => onUnplace(block.id)}
+          >
+            Remove from board
+          </button>
+        )}
+        {isGroup && onDeleteGroup && (
+          <ConfirmDeleteGroupButton groupId={block.id} onDeleteGroup={onDeleteGroup} />
+        )}
+      </div>
     </aside>
+  )
+}
+
+function GroupPanel({
+  blockId,
+  name,
+  memberCount,
+  onRenameGroup,
+}: {
+  blockId: string
+  name: string
+  memberCount: number
+  onRenameGroup?: (blockId: string, name: string) => void
+}) {
+  const [value, setValue] = useState(name)
+
+  useEffect(() => {
+    setValue(name)
+  }, [name])
+
+  const commit = () => {
+    if (onRenameGroup && value.trim() && value.trim() !== name) {
+      onRenameGroup(blockId, value)
+    } else {
+      setValue(name)
+    }
+  }
+
+  return (
+    <div className="inspector-field">
+      <label className="inspector-label" htmlFor={`group-name-${blockId}`}>
+        Name
+      </label>
+      <input
+        id={`group-name-${blockId}`}
+        className="inspector-input"
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.currentTarget.blur()
+          }
+        }}
+      />
+      <p className="inspector-hint">
+        {memberCount} {memberCount === 1 ? 'file' : 'files'} in this group
+      </p>
+    </div>
+  )
+}
+
+function ConfirmDeleteGroupButton({
+  groupId,
+  onDeleteGroup,
+}: {
+  groupId: string
+  onDeleteGroup: (groupId: string) => void
+}) {
+  const [armed, setArmed] = useState(false)
+
+  useEffect(() => {
+    setArmed(false)
+  }, [groupId])
+
+  return (
+    <button
+      type="button"
+      className={`inspector-btn danger${armed ? ' is-armed' : ''}`}
+      onClick={() => {
+        if (armed) {
+          onDeleteGroup(groupId)
+        } else {
+          setArmed(true)
+        }
+      }}
+    >
+      {armed ? 'Click again to confirm' : 'Delete group'}
+    </button>
   )
 }
 
