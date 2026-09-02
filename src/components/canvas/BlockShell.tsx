@@ -27,6 +27,8 @@ interface BlockShellProps {
   placement: ObservablePlacement
   onDragEnd: (position: Vec) => void
   onCommitText?: (blockId: string, markdown: string) => void
+  onSelect?: (blockId: string) => void
+  selected?: boolean
 }
 
 export function BlockShell({
@@ -34,6 +36,8 @@ export function BlockShell({
   placement,
   onDragEnd,
   onCommitText,
+  onSelect,
+  selected = false,
 }: BlockShellProps) {
   const { viewport } = useViewport()
 
@@ -63,6 +67,7 @@ export function BlockShell({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || editing) return
+    onSelect?.(block.id)
     e.preventDefault()
     e.stopPropagation()
     dragRef.current = {
@@ -126,7 +131,7 @@ export function BlockShell({
   return (
     <div
       ref={elRef}
-      className={`block-shell${isText ? ' is-text' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}`}
+      className={`block-shell${isText ? ' is-text' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}`}
       style={{ left: placement.positionX, top: placement.positionY }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

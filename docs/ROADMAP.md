@@ -34,6 +34,10 @@ things are done before they are done.
   Enter persists through TanStack DB/server functions/Postgres; Escape or blur
   cancels. Verified formatted rendering, cancellation, and persistence across
   reload. See START_PLAN.md §M3.
+- **Chrome — Figma-style docked UI:** top bar, tool rail (Move/Hand/Text), left
+  Layers/Assets dock, right Inspector (editable X/Y), bottom status bar, block
+  selection + highlights, and a zoom-aware dot grid that re-snaps per zoom. See
+  CHANGELOG 2026-09-02.
 
 ## In progress
 

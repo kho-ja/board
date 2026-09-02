@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-09-02 — Figma-style chrome + zoom-aware dot grid
+
+- Replaced the floating pill UI (top-right brand card, floating library dock,
+  floating zoom cluster) with a docked Figma-like chrome: full-width top bar
+  (brand + theme toggle + shortcut hints), a left vertical tool rail, a left
+  Layers/Assets dock, a right Inspector, and a bottom status bar with the zoom
+  cluster and block counts.
+- **Tools:** Move (V) / Hand (H, or hold Space) / Text (T). The Move tool drags
+  blocks and pans the canvas; the Hand tool pans from anywhere (including on
+  blocks); the Text tool drops a new text block where you click, then selects it.
+- **Selection:** clicking a block selects it (Figma-style highlight ring);
+  clicking empty canvas deselects. The Inspector shows the selected block's kind,
+  title, editable X/Y position (commits through the placement collection), ID,
+  and schema version. The Layers tab lists placed blocks (click to select), the
+  Assets tab lists unplaced blocks with a Place action.
+- **Dot grid is now zoom-aware (Figma behaviour):** a screen-space grid layer
+  whose spacing snaps to "nice" steps (1/2/5 × 10ⁿ world units) per zoom level and
+  whose background-position tracks the viewport offset modulo the on-screen step,
+  so the dots pan seamlessly and hold constant density instead of scaling.
+  Grid geometry updates on the same rAF hot path as the world transform
+  (`usePanZoom`) and on committed viewport changes.
+- Verified in the browser: layout geometry of all five chrome regions, tool
+  switching + shortcuts, text-tool placement, selection + inspector + X/Y edit,
+  deselect on empty click, zoom re-snap (50px → 27px at 135%), and pan-gird
+  tracking. `npm run lint` and `npm run build` pass.
+
 ## 2026-09-02 — Product-route cleanup
 
 - Promoted the working canvas from `/demo/m2` to the root `/` route.
