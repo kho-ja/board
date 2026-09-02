@@ -4,8 +4,7 @@ import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
 interface InspectorProps {
-  block: ObservableBlock | null
-  placement: ObservablePlacement | null
+  selected: { block: ObservableBlock; placement: ObservablePlacement | null }[]
   onUpdatePosition: (blockId: string, x: number, y: number) => void
 }
 
@@ -13,14 +12,41 @@ function round(v: number): string {
   return String(Math.round(v * 100) / 100)
 }
 
-export function Inspector({ block, placement, onUpdatePosition }: InspectorProps) {
-  if (!block) {
+export function Inspector({ selected, onUpdatePosition }: InspectorProps) {
+  if (selected.length === 0) {
     return (
       <aside className="inspector">
         <p className="inspector-empty">No selection</p>
       </aside>
     )
   }
+
+  if (selected.length > 1) {
+    const kinds = new Map<string, number>()
+    for (const { block } of selected) {
+      kinds.set(block.kind, (kinds.get(block.kind) ?? 0) + 1)
+    }
+    return (
+      <aside className="inspector">
+        <div className="inspector-head">
+          <span className="inspector-kind">{selected.length}</span>
+          <h2 className="inspector-title">blocks selected</h2>
+        </div>
+        <dl className="inspector-meta">
+          {Array.from(kinds.entries()).map(([kind, count]) => (
+            <div key={kind}>
+              <dt>{kind}</dt>
+              <dd>
+                {count} {count === 1 ? 'block' : 'blocks'}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </aside>
+    )
+  }
+
+  const { block, placement } = selected[0]
 
   return (
     <aside className="inspector">

@@ -9,7 +9,7 @@ type Tab = 'layers' | 'assets'
 interface LeftDockProps {
   placed: { block: ObservableBlock; placement: ObservablePlacement }[]
   unplaced: ObservableBlock[]
-  selectedId: string | null
+  selectedIds: ReadonlySet<string>
   onSelect: (blockId: string) => void
   onPlace: (blockId: string, index: number) => void
 }
@@ -17,7 +17,7 @@ interface LeftDockProps {
 export function LeftDock({
   placed,
   unplaced,
-  selectedId,
+  selectedIds,
   onSelect,
   onPlace,
 }: LeftDockProps) {
@@ -62,7 +62,7 @@ export function LeftDock({
                 <li key={block.id}>
                   <button
                     type="button"
-                    className={`layer-row${selectedId === block.id ? ' is-selected' : ''}`}
+                    className={`layer-row${selectedIds.has(block.id) ? ' is-selected' : ''}`}
                     onClick={() => onSelect(block.id)}
                   >
                     <span className="layer-chip" aria-hidden="true" />

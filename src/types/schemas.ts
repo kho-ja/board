@@ -38,15 +38,25 @@ export const BlockDataSchema = z.union([
   ObjectBlockDataSchema,
 ])
 
-export const BlockSchema = z.object({
-  id: z.string(),
-  kind: z.string(),
-  data: BlockDataSchema,
-  viewOverride: z.string().nullable().optional(),
-  schemaVersion: z.string().default('1'),
-  createdAt: z.coerce.date().optional(),
-  updatedAt: z.coerce.date().optional(),
-})
+export const BlockSchema = z
+  .object({
+    id: z.string(),
+    kind: z.string(),
+    data: BlockDataSchema,
+    viewOverride: z.string().nullable().optional(),
+    schemaVersion: z.string().default('1'),
+    createdAt: z.coerce.date().optional(),
+    updatedAt: z.coerce.date().optional(),
+  })
+  .superRefine((block, ctx) => {
+    if (block.kind !== block.data.kind) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `block.kind (${block.kind}) must match data.kind (${block.data.kind})`,
+        path: ['kind'],
+      })
+    }
+  })
 
 export const PlacementSchema = z.object({
   blockId: z.string(),

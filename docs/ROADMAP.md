@@ -38,21 +38,25 @@ things are done before they are done.
   Layers/Assets dock, right Inspector (editable X/Y), bottom status bar, block
   selection + highlights, and a zoom-aware dot grid that re-snaps per zoom. See
   CHANGELOG 2026-09-02.
+- **M4 — File blocks + paste:** "Paste files" button + hidden multi-file input in
+  the top bar, plus a canvas drop zone; dropped/picked files become `file` blocks
+  (metadata only) rendered as file cards, auto-placed in a cascade grid, with the
+  first selected. Text blocks render plain-text Figma-style. Also fixed a
+  placement FK race by awaiting `tx.isPersisted.promise` on the block insert
+  before inserting the placement. See CHANGELOG 2026-09-02.
 
 ## In progress
 
-- **M4 — File blocks + paste (drag-drop + hidden input).** Build questions are
-  resolved in BUILD_QUESTIONS.md; implementation is next.
+- Nothing currently blocked — next work item below.
 
 ## Next (in rough order)
 
-0. **M4 — File blocks + paste (drag-drop + hidden input).** See START_PLAN.md §M4.
-
-1. **The generic schema system** — block types defined by composed fields (with
-   `file` / `file-group` as the first preset types), rendered on a pan/zoom canvas
-   (in-memory). **Milestone = model + reference grouping, not just dragging:** paste
-   file **references** → group them into a File Group → switch card/list view.
-   (Per DECISIONS.md, v1 files are references/metadata only — no real preview yet.)
+0. **Generic schema system / group creation** — block types defined by composed
+   fields (with `file` / `file-group` as the first preset types), rendered on a
+   pan/zoom canvas (in-memory). **Milestone = model + reference grouping, not just
+   dragging:** paste file **references** → group them into a File Group → switch
+   card/list view. (Per DECISIONS.md, v1 files are references/metadata only — no
+   real preview yet.)
 2. **v1 relationships** — simple "link with a line" between blocks, plus **group
    membership** made by pasting files into a File Group (a File Group renders its
    members as card/list per view). Many-to-many: a file can belong to multiple

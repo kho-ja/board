@@ -11,6 +11,7 @@ import { Canvas } from '#/components/canvas/Canvas'
 import { ViewportProvider, useViewport } from '#/components/canvas/ViewportProvider'
 import { ToolRail } from '#/components/canvas/ToolRail'
 import type { Tool } from '#/components/canvas/tools'
+import { makeFileBlock } from '#/blocks/file/makeFileBlock'
 import { LeftDock } from '#/components/canvas/LeftDock'
 import { Inspector } from '#/components/canvas/Inspector'
 import { StatusBar } from '#/components/canvas/StatusBar'
@@ -87,7 +88,7 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   const { ref: containerRef, width, height } = useElementSize<HTMLDivElement>()
   const { viewport, setViewport } = useViewport()
   const [tool, setTool] = useState<Tool>('move')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [spaceHeld, setSpaceHeld] = useState(false)
   const forcePan = tool === 'hand' || spaceHeld
 
@@ -118,10 +119,29 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   }, [blocks, placements, visibleRect])
 
   const byId = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks])
-  const selectedBlock = selectedId ? (byId.get(selectedId) ?? null) : null
-  const selectedPlacement = selectedId
-    ? (placements.find((p) => p.blockId === selectedId) ?? null)
-    : null
+  const selectedBlocks = useMemo(
+    () =>
+      placements
+        .map((placement) => ({ placement, block: byId.get(placement.blockId) }))
+        .filter(
+          (
+            entry,
+          ): entry is { placement: ObservablePlacement; block: ObservableBlock } =>
+            !!entry.block && selectedIds.has(entry.block.id),
+        ),
+    [byId, placements, selectedIds],
+  )
+
+  const selectOnly = useCallback((id: string) => setSelectedIds(new Set([id])), [])
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const viewCenter = useCallback((): Vec => {
     if (width <= 0 || height <= 0) {
@@ -163,20 +183,21 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   }
 
   const addTextAt = useCallback(
-    (world: Vec) => {
+    async (world: Vec) => {
       const id = crypto.randomUUID()
-      collections.blocksCollection.insert({
+      const tx = collections.blocksCollection.insert({
         id,
         kind: 'text',
         data: { kind: 'text', markdown: DEFAULT_TEXT } satisfies TextBlockData,
         schemaVersion: '1',
       })
+      await tx.isPersisted.promise
       collections.placementsCollection.insert({
         blockId: id,
         positionX: Math.round(world.x - BLOCK_WIDTH / 2),
         positionY: Math.round(world.y - BLOCK_HEIGHT / 2),
       })
-      setSelectedId(id)
+      setSelectedIds(new Set([id]))
     },
     [collections],
   )
@@ -190,9 +211,51 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
       positionX: Math.round(origin.x - BLOCK_WIDTH / 2 + col * GRID_SPACING),
       positionY: Math.round(origin.y - BLOCK_HEIGHT / 2 + row * GRID_SPACING),
     })
-    setSelectedId(blockId)
+    setSelectedIds(new Set([blockId]))
     setTool('move')
   }
+
+  // Cascade-import dropped/picked files as `file` blocks (metadata only), each
+  // auto-placed on a GRID_SPACING grid anchored at `anchor`. Anchor for drops
+  // is the drop point; for the picker button it is the m2 (80, 80) screen point.
+  // Each file's placement is inserted only after its block row has committed
+  // (await) so the placements FK never races the blocks write.
+  const importFiles = useCallback(
+    async (files: File[], anchor: Vec) => {
+      let firstId: string | null = null
+      for (let index = 0; index < files.length; index++) {
+        const id = crypto.randomUUID()
+        const col = index % 5
+        const row = Math.floor(index / 5)
+        const tx = collections.blocksCollection.insert({
+          id,
+          ...makeFileBlock(files[index]),
+          schemaVersion: '1',
+        })
+        await tx.isPersisted.promise
+        collections.placementsCollection.insert({
+          blockId: id,
+          positionX: Math.round(anchor.x - BLOCK_WIDTH / 2 + col * GRID_SPACING),
+          positionY: Math.round(anchor.y - BLOCK_HEIGHT / 2 + row * GRID_SPACING),
+        })
+        if (firstId === null) firstId = id
+      }
+      if (firstId !== null) setSelectedIds(new Set([firstId]))
+    },
+    [collections],
+  )
+
+  const pickFiles = useCallback(
+    (files: File[]) => {
+      importFiles(files, screenToWorld(viewport, { x: 80, y: 80 }))
+    },
+    [importFiles, viewport],
+  )
+
+  const onImportFiles = useCallback(
+    (files: File[], anchor: Vec) => importFiles(files, anchor),
+    [importFiles],
+  )
 
   const zoomAtCenter = (factor: number) => {
     if (width <= 0 || height <= 0) return
@@ -219,10 +282,10 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
       const key = event.key.toLowerCase()
       if (key === 'v') setTool('move')
       else if (key === 'h') setTool('hand')
-      else if (key === 't') {
-        setTool((t) => (t === 'text' ? 'move' : 'text'))
-      } else if (key === 'escape') {
-        setSelectedId(null)
+      else if (key === 't') setTool('text')
+      else if (key === 'escape') {
+        setTool('move')
+        setSelectedIds(new Set())
       }
     }
     const onKeyUp = (event: KeyboardEvent) => {
@@ -240,19 +303,45 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   const onPress = useCallback(
     (world: Vec) => {
       if (tool === 'text') {
-        addTextAt(world)
+        void addTextAt(world)
       }
     },
     [addTextAt, tool],
   )
 
-  const onDeselect = useCallback(() => setSelectedId(null), [])
-
-  const selectBlock = useCallback((id: string) => setSelectedId(id), [])
+  // Marquee box-selection: a drag on empty canvas with the Move tool selects
+  // every block whose placement rect intersects the dragged rectangle. A click
+  // (no drag) reports `null`, which clears the selection.
+  const onMarquee = useCallback(
+    (world: WorldRect | null) => {
+      if (!world) {
+        setSelectedIds(new Set())
+        return
+      }
+      const next = new Set<string>()
+      for (const placement of placements) {
+        if (!byId.has(placement.blockId)) continue
+        if (
+          rectsOverlap(
+            world,
+            rectFromWorldPoint(
+              { x: placement.positionX, y: placement.positionY },
+              BLOCK_WIDTH,
+              BLOCK_HEIGHT,
+            ),
+          )
+        ) {
+          next.add(placement.blockId)
+        }
+      }
+      setSelectedIds(next)
+    },
+    [byId, placements],
+  )
 
   return (
     <div className="board-shell">
-      <TopBar />
+      <TopBar onPickFiles={pickFiles} />
       <div className="board-main">
         <ToolRail tool={tool} onSelect={setTool} />
         <LeftDock
@@ -264,8 +353,8 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
               !!entry.block,
           )}
           unplaced={unplaced}
-          selectedId={selectedId}
-          onSelect={selectBlock}
+          selectedIds={selectedIds}
+          onSelect={selectOnly}
           onPlace={placeAt}
         />
         <div className="canvas-area">
@@ -275,7 +364,8 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
             tool={tool}
             forcePan={forcePan}
             onPress={onPress}
-            onDeselect={onDeselect}
+            onMarquee={onMarquee}
+            onImportFiles={onImportFiles}
           >
             {placedBlocks.map(({ placement, block }) => (
               <BlockShell
@@ -284,15 +374,15 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
                 placement={placement}
                 onDragEnd={(position) => handleDragEnd(block.id, position)}
                 onCommitText={commitText}
-                onSelect={selectBlock}
-                selected={selectedId === block.id}
+                onSelect={selectOnly}
+                onToggleSelect={toggleSelect}
+                selected={selectedIds.has(block.id)}
               />
             ))}
           </Canvas>
         </div>
         <Inspector
-          block={selectedBlock}
-          placement={selectedPlacement}
+          selected={selectedBlocks}
           onUpdatePosition={handleUpdatePosition}
         />
       </div>
@@ -304,7 +394,7 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
         onZoomOut={() => zoomAtCenter(1 / 1.35)}
         onReset={() => {
           setViewport(DEFAULT_VIEWPORT)
-          setSelectedId(null)
+          setSelectedIds(new Set())
         }}
       />
     </div>
