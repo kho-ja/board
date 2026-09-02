@@ -1,5 +1,64 @@
 # Changelog
 
+## 2026-09-02 — Canvas tools rework: marquee select, panning, cursors
+
+- **Move tool** is now exclusively select/drag: dragging from empty canvas draws
+  a **box (marquee) select** and selects every block intersecting the box; empty
+  click deselects. Plain click selects one; ctrl/cmd/shift-click toggles.
+  Multi-select ripples through the chain — Inspector shows "N blocks selected"
+  with per-kind counts, and Layers rows highlight alongside canvas shells.
+- **Panning** is restricted to the Hand tool, holding **Space** (temporary pan
+  in any tool), and **middle-mouse** drag. Move-tool empty-drag no longer pans.
+- **Text tool** always activates on `T` (no more toggle), so consecutive clicks
+  at different spots create multiple text blocks.
+- **Escape** returns to the Move tool and clears the selection.
+- Per-tool cursors: default arrow over empty canvas, `grab` over blocks and in
+  the Hand tool, `grabbing` while panning, text-insert cursor in the Text tool.
+- Shortcut hint in the top bar: `V Move · H Hand · T Text · Space pan`.
+- Verified in the browser: marquee selected 15 blocks with Inspector summary,
+  ctrl-click toggle, Hand/Space/middle-mouse pans update the transform, Text
+  stays active and places committed blocks (count rose in lockstep), Esc resets.
+  `npm run tsc`, `npm run lint`, and `npm run build` pass.
+
+## 2026-09-02 — In-place Figma-style text editor
+
+- The text-block editor is now an **in-place transparent editor** instead of a
+  boxed card: borderless, transparent, no padding/glow, with only the blinking
+  caret visible and a Figma-style selection outline around the text extent while
+  editing. The textarea auto-grows to match the rendered content's height, so
+  entering and leaving edit mode does not shift or clip the text.
+- Enter still commits and Escape cancels (commit-on-blur unchanged).
+
+## 2026-09-02 — M4 file blocks + paste, FK race fix
+
+- **File blocks:** dropped or picked files become `file` blocks storing metadata
+  (name, size, mimeType) via `makeFileBlock`, rendered as a file card with a
+  mimetype colour chip, name, and formatted size (`formatBytes`).
+- **Import surface:** a "Paste files" button + hidden multi-file picker in the
+  top bar, plus a canvas drop zone (`onDragEnter/Over/Leave/Drop`) that highlights
+  the canvas while a drag is over it and anchoring the cascade placement at the
+  drop point (or the m2 screen corner for the picker).
+- **Cascade placement:** imported files are auto-placed on a `GRID_SPACING` grid
+  fanning out from the anchor, and the first file is selected.
+- **Schema hardening:** `BlockSchema.superRefine` asserts `block.kind` matches
+  `data.kind`, so a mismatched block insert is rejected instead of silently
+  accepted.
+- **Plain-text (Figma) text blocks:** text blocks render as bare grey text with
+  no card chrome/border/background/padding; only the selection outline shows.
+  Double-click still enters in-place edit.
+- **Fixed a placement FK race:** `collection.insert()` returns a `Transaction`
+  whose `await` only settles the optimistic local write, not the server commit.
+  Because a placement row references the block row (`block_id → blocks.id`),
+  inserting block+placement back-to-back let the placement POST race ahead and
+  fail the FK check, silently dropping placement rows (23 placements for 28
+  blocks in the DB). Creation paths now `await tx.isPersisted.promise` on the
+  block insert before inserting the placement, serializing the writes so the
+  placement always commits. Verified in the browser: block commits first, then
+  placement, and placed count now rises in lockstep with total.
+- Verified in the browser: drop/pick of multiple files creates blocks and
+  renders file cards on canvas, placed count matches total. `npm run tsc`,
+  `npm run lint`, and `npm run build` pass.
+
 ## 2026-09-02 — Figma-style chrome + zoom-aware dot grid
 
 - Replaced the floating pill UI (top-right brand card, floating library dock,

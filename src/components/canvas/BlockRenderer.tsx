@@ -1,3 +1,4 @@
+import { FileCard } from '#/blocks/file/FileCard'
 import { TextBlockView } from '#/blocks/text/TextBlock'
 import type {
   FileBlockData,
@@ -23,6 +24,9 @@ export function blockTitle(block: ObservableBlock): string {
 export function BlockRenderer({ block }: { block: ObservableBlock }) {
   if (block.kind === 'text') {
     return <TextBlockView data={block.data as TextBlockData} />
+  }
+  if (block.kind === 'file') {
+    return <FileCard data={block.data as FileBlockData} />
   }
   return <p className="block-title">{blockTitle(block)}</p>
 }

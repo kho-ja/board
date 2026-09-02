@@ -28,6 +28,7 @@ interface BlockShellProps {
   onDragEnd: (position: Vec) => void
   onCommitText?: (blockId: string, markdown: string) => void
   onSelect?: (blockId: string) => void
+  onToggleSelect?: (blockId: string) => void
   selected?: boolean
 }
 
@@ -37,6 +38,7 @@ export function BlockShell({
   onDragEnd,
   onCommitText,
   onSelect,
+  onToggleSelect,
   selected = false,
 }: BlockShellProps) {
   const { viewport } = useViewport()
@@ -67,6 +69,16 @@ export function BlockShell({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || editing) return
+
+    // Modifier-click toggles membership without starting a drag (Figma-like
+    // additive selection with ctrl/cmd; we also accept shift).
+    if ((e.ctrlKey || e.metaKey || e.shiftKey) && onToggleSelect) {
+      onToggleSelect(block.id)
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+
     onSelect?.(block.id)
     e.preventDefault()
     e.stopPropagation()
