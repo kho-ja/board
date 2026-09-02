@@ -3,9 +3,10 @@ import { FileImport } from './FileImport'
 
 interface TopBarProps {
   onPickFiles?: (files: File[]) => void
+  onCreateGroup?: () => void
 }
 
-export function TopBar({ onPickFiles }: TopBarProps) {
+export function TopBar({ onPickFiles, onCreateGroup }: TopBarProps) {
   return (
     <header className="board-topbar">
       <div className="brand">
@@ -17,6 +18,16 @@ export function TopBar({ onPickFiles }: TopBarProps) {
       </div>
       <div className="topbar-actions">
         <span className="topbar-hint">V Move · H Hand · T Text · Space pan</span>
+        {onCreateGroup && (
+          <button
+            type="button"
+            className="group-create-button"
+            onClick={onCreateGroup}
+            title="Create an empty File Group on the board"
+          >
+            File Group
+          </button>
+        )}
         {onPickFiles && <FileImport onPick={onPickFiles} />}
         <ThemeToggle className="theme-toggle" />
       </div>

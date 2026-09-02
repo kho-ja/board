@@ -49,19 +49,19 @@ things are done before they are done.
 
 - Nothing currently blocked — next work item below.
 
+## Completed
+
+- **M6 File Groups** — generic schema system + reference grouping: `file-group` block on
+  canvas with create, drop-file-to-add (membership CRUD), card/list view toggle
+  (persisted), rename, remove from board (memberships preserved for re-place),
+  delete (memberships dropped, member placements survive). Tested: persistence,
+  re-place restores members, member click selects underlying placed file, two-step
+  delete confirm.
+
 ## Next (in rough order)
 
-0. **Generic schema system / group creation** — block types defined by composed
-   fields (with `file` / `file-group` as the first preset types), rendered on a
-   pan/zoom canvas (in-memory). **Milestone = model + reference grouping, not just
-   dragging:** paste file **references** → group them into a File Group → switch
-   card/list view. (Per DECISIONS.md, v1 files are references/metadata only — no
-   real preview yet.)
-2. **v1 relationships** — simple "link with a line" between blocks, plus **group
-   membership** made by pasting files into a File Group (a File Group renders its
-   members as card/list per view). Many-to-many: a file can belong to multiple
-   groups.
-3. Save/load of the canvas layout (see OQ-13 schema versioning).
+0. **v1 relationships** — simple "link with a line" between blocks.
+1. Save/load of the canvas layout (see OQ-13 schema versioning).
 4. The side-panel / asset library, and how group membership is stored (OQ-10).
 
 > **Typed connections** (`depends-on`, `responsible-for`, `part-of`, `related-to`)

@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-09-02 — M6: File Group blocks (create, drop-to-add, view toggle, delete)
+
+- **File Group block** (`file-group`): a placed block that renders its members as
+  a card or list and supports creating new groups via the top-bar "File Group"
+  button. Group view (card/list) persists in block data and survives reload.
+- **Drop files onto a group** to add memberships: dropped files are imported as
+  `file` blocks (placed on the canvas) and added as group members via the
+  `memberships` collection; the FK race rule (`await tx.isPersisted.promise`)
+  applies to both file and group inserts.
+- **Remove from board** on a group unplaces the group but keeps memberships,
+  so re-placing the group restores its member cards/list. **Delete group**
+  (two-step confirm) drops memberships; member placements survive.
+- **Rename group** via an editable name input in the Inspector (commits on blur
+  or Enter). **Member click** selects the underlying placed file block without
+  selecting the group.
+- **Guard:** File Groups hold only files in v1 — the client dedupes
+  memberships and the DB enforces a unique `(group_id, member_id)` index.
+- Verified in the browser: create → drop 2 files → toggle card → list shows
+  members → Inspector shows "2 files in this group" → rename → remove from
+  board (memberships preserved) → re-place restores members → delete group
+  (two-step) leaves file placements. `npm run tsc`, `npm run lint`, and
+  `npm run build` pass.
+
 ## 2026-09-02 — Canvas tools rework: marquee select, panning, cursors
 
 - **Move tool** is now exclusively select/drag: dragging from empty canvas draws
