@@ -87,3 +87,20 @@ export function rectsOverlap(a: WorldRect, b: WorldRect): boolean {
 export function viewportChanged(a: ViewportTransform, b: ViewportTransform): boolean {
   return a.scale !== b.scale || a.offset.x !== b.offset.x || a.offset.y !== b.offset.y
 }
+
+export const GRID_MIN_SCREEN_SPACING = 26
+
+/** Snap the dot-grid spacing to a "nice" world step (1/2/5 × 10ⁿ) so that the
+ * on-screen dot density stays roughly constant as you zoom, like Figma. */
+export function gridSizeForScale(scale: number): number {
+  const idealWorld = GRID_MIN_SCREEN_SPACING / Math.max(scale, 1e-6)
+  const pow = 10 ** Math.floor(Math.log10(idealWorld))
+  const mant = idealWorld / pow
+  const mult = mant <= 1 ? 1 : mant <= 2 ? 2 : mant <= 5 ? 5 : 10
+  return mult * pow
+}
+
+/** Remainder in [0, m) so a translated grid tiles seamlessly with pan. */
+export function mod(a: number, m: number): number {
+  return ((a % m) + m) % m
+}

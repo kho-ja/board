@@ -7,11 +7,15 @@ import type {
   ObservableBlock,
   ObservablePlacement,
 } from '#/components/canvas/BlockShell'
-import { blockTitle } from '#/components/canvas/BlockRenderer'
 import { Canvas } from '#/components/canvas/Canvas'
 import { ViewportProvider, useViewport } from '#/components/canvas/ViewportProvider'
+import { ToolRail } from '#/components/canvas/ToolRail'
+import type { Tool } from '#/components/canvas/tools'
+import { LeftDock } from '#/components/canvas/LeftDock'
+import { Inspector } from '#/components/canvas/Inspector'
+import { StatusBar } from '#/components/canvas/StatusBar'
+import { TopBar } from '#/components/canvas/TopBar'
 import { useElementSize } from '#/hooks/useElementSize'
-import ThemeToggle from '#/components/ThemeToggle'
 import {
   DEFAULT_VIEWPORT,
   rectFromWorldPoint,
@@ -20,7 +24,7 @@ import {
   visibleWorldRect,
   zoomAt,
 } from '#/lib/canvas/transform'
-import type { Vec, ViewportTransform, WorldRect } from '#/lib/canvas/transform'
+import type { Vec, WorldRect } from '#/lib/canvas/transform'
 import type { TextBlockData } from '#/types'
 import type { Collections } from '#/collections'
 
@@ -82,7 +86,10 @@ interface BoardProps {
 function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   const { ref: containerRef, width, height } = useElementSize<HTMLDivElement>()
   const { viewport, setViewport } = useViewport()
-  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [tool, setTool] = useState<Tool>('move')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+  const forcePan = tool === 'hand' || spaceHeld
 
   const visibleRect = useMemo<WorldRect | null>(
     () => (width > 0 && height > 0 ? visibleWorldRect(viewport, width, height) : null),
@@ -110,6 +117,12 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
     )
   }, [blocks, placements, visibleRect])
 
+  const byId = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks])
+  const selectedBlock = selectedId ? (byId.get(selectedId) ?? null) : null
+  const selectedPlacement = selectedId
+    ? (placements.find((p) => p.blockId === selectedId) ?? null)
+    : null
+
   const viewCenter = useCallback((): Vec => {
     if (width <= 0 || height <= 0) {
       return screenToWorld(viewport, { x: 80, y: 80 })
@@ -133,27 +146,40 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
     }
   }
 
+  const handleUpdatePosition = (blockId: string, x: number, y: number) => {
+    const existing = placements.find((p) => p.blockId === blockId)
+    if (existing) {
+      collections.placementsCollection.update(blockId, (draft) => {
+        draft.positionX = x
+        draft.positionY = y
+      })
+    }
+  }
+
   const commitText = (blockId: string, markdown: string) => {
     collections.blocksCollection.update(blockId, (draft) => {
       draft.data = { kind: 'text', markdown } satisfies TextBlockData
     })
   }
 
-  const addTextAtViewCenter = useCallback(() => {
-    const id = crypto.randomUUID()
-    const origin = viewCenter()
-    collections.blocksCollection.insert({
-      id,
-      kind: 'text',
-      data: { kind: 'text', markdown: DEFAULT_TEXT } satisfies TextBlockData,
-      schemaVersion: '1',
-    })
-    collections.placementsCollection.insert({
-      blockId: id,
-      positionX: Math.round(origin.x - BLOCK_WIDTH / 2),
-      positionY: Math.round(origin.y - BLOCK_HEIGHT / 2),
-    })
-  }, [collections, viewCenter])
+  const addTextAt = useCallback(
+    (world: Vec) => {
+      const id = crypto.randomUUID()
+      collections.blocksCollection.insert({
+        id,
+        kind: 'text',
+        data: { kind: 'text', markdown: DEFAULT_TEXT } satisfies TextBlockData,
+        schemaVersion: '1',
+      })
+      collections.placementsCollection.insert({
+        blockId: id,
+        positionX: Math.round(world.x - BLOCK_WIDTH / 2),
+        positionY: Math.round(world.y - BLOCK_HEIGHT / 2),
+      })
+      setSelectedId(id)
+    },
+    [collections],
+  )
 
   const placeAt = (blockId: string, index: number) => {
     const origin = viewCenter()
@@ -164,6 +190,8 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
       positionX: Math.round(origin.x - BLOCK_WIDTH / 2 + col * GRID_SPACING),
       positionY: Math.round(origin.y - BLOCK_HEIGHT / 2 + row * GRID_SPACING),
     })
+    setSelectedId(blockId)
+    setTool('move')
   }
 
   const zoomAtCenter = (factor: number) => {
@@ -172,183 +200,113 @@ function Board({ blocks, placements, unplaced, collections }: BoardProps) {
   }
 
   useEffect(() => {
+    const isTyping = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable)
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 't' && event.key !== 'T') return
+      if (isTyping(event.target)) return
       if (event.metaKey || event.ctrlKey || event.altKey) return
-      const target = event.target
-      if (
-        target instanceof HTMLElement &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
+
+      if (event.code === 'Space') {
+        event.preventDefault()
+        setSpaceHeld(true)
         return
       }
-      event.preventDefault()
-      addTextAtViewCenter()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [addTextAtViewCenter])
 
-  useEffect(() => {
-    if (unplaced.length > 0) setLibraryOpen(true)
-  }, [unplaced.length])
+      const key = event.key.toLowerCase()
+      if (key === 'v') setTool('move')
+      else if (key === 'h') setTool('hand')
+      else if (key === 't') {
+        setTool((t) => (t === 'text' ? 'move' : 'text'))
+      } else if (key === 'escape') {
+        setSelectedId(null)
+      }
+    }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') setSpaceHeld(false)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [])
+
+  const onPress = useCallback(
+    (world: Vec) => {
+      if (tool === 'text') {
+        addTextAt(world)
+      }
+    },
+    [addTextAt, tool],
+  )
+
+  const onDeselect = useCallback(() => setSelectedId(null), [])
+
+  const selectBlock = useCallback((id: string) => setSelectedId(id), [])
 
   return (
     <div className="board-shell">
-      <Canvas containerRef={containerRef} className="canvas-board">
-        {placedBlocks.map(({ placement, block }) => (
-          <BlockShell
-            key={block.id}
-            block={block}
-            placement={placement}
-            onDragEnd={(position) => handleDragEnd(block.id, position)}
-            onCommitText={commitText}
-          />
-        ))}
-      </Canvas>
-
       <TopBar />
-      <ToolRail onAddText={addTextAtViewCenter} />
-      <ZoomCluster
+      <div className="board-main">
+        <ToolRail tool={tool} onSelect={setTool} />
+        <LeftDock
+          placed={placements.map((placement) => ({
+            placement,
+            block: byId.get(placement.blockId),
+          })).filter(
+            (entry): entry is { placement: ObservablePlacement; block: ObservableBlock } =>
+              !!entry.block,
+          )}
+          unplaced={unplaced}
+          selectedId={selectedId}
+          onSelect={selectBlock}
+          onPlace={placeAt}
+        />
+        <div className="canvas-area">
+          <Canvas
+            containerRef={containerRef}
+            className="canvas-board"
+            tool={tool}
+            forcePan={forcePan}
+            onPress={onPress}
+            onDeselect={onDeselect}
+          >
+            {placedBlocks.map(({ placement, block }) => (
+              <BlockShell
+                key={block.id}
+                block={block}
+                placement={placement}
+                onDragEnd={(position) => handleDragEnd(block.id, position)}
+                onCommitText={commitText}
+                onSelect={selectBlock}
+                selected={selectedId === block.id}
+              />
+            ))}
+          </Canvas>
+        </div>
+        <Inspector
+          block={selectedBlock}
+          placement={selectedPlacement}
+          onUpdatePosition={handleUpdatePosition}
+        />
+      </div>
+      <StatusBar
         viewport={viewport}
-        visibleCount={placedBlocks.length}
-        totalCount={placements.length}
+        placedCount={placements.length}
+        blockCount={blocks.length}
         onZoomIn={() => zoomAtCenter(1.35)}
         onZoomOut={() => zoomAtCenter(1 / 1.35)}
-        onReset={() => setViewport(DEFAULT_VIEWPORT)}
-      />
-      <LibraryPanel
-        open={libraryOpen}
-        unplaced={unplaced}
-        onToggle={() => setLibraryOpen((open) => !open)}
-        onPlace={placeAt}
+        onReset={() => {
+          setViewport(DEFAULT_VIEWPORT)
+          setSelectedId(null)
+        }}
       />
     </div>
-  )
-}
-
-function TopBar() {
-  return (
-    <header className="board-topbar">
-      <div className="board-brand">
-        <span className="board-mark" aria-hidden="true" />
-        <div className="board-brand-copy">
-          <p className="board-name">Kho-ja</p>
-          <p className="board-file">Board</p>
-        </div>
-      </div>
-      <ThemeToggle className="chrome-toggle" />
-    </header>
-  )
-}
-
-function ToolRail({ onAddText }: { onAddText: () => void }) {
-  return (
-    <nav className="tool-rail" aria-label="Tools">
-      <button
-        type="button"
-        className="tool-button"
-        onClick={onAddText}
-        title="Text (T)"
-        aria-label="Add text block"
-      >
-        <span className="tool-letter">T</span>
-      </button>
-    </nav>
-  )
-}
-
-interface ZoomClusterProps {
-  viewport: ViewportTransform
-  visibleCount: number
-  totalCount: number
-  onZoomIn: () => void
-  onZoomOut: () => void
-  onReset: () => void
-}
-
-function ZoomCluster({
-  viewport,
-  visibleCount,
-  totalCount,
-  onZoomIn,
-  onZoomOut,
-  onReset,
-}: ZoomClusterProps) {
-  return (
-    <div className="zoom-cluster">
-      <button type="button" className="chrome-icon" onClick={onZoomOut} aria-label="Zoom out">
-        −
-      </button>
-      <button
-        type="button"
-        className="zoom-percent"
-        onClick={onReset}
-        title="Reset view"
-        aria-label={`Zoom ${Math.round(viewport.scale * 100)} percent. Click to reset view.`}
-      >
-        {Math.round(viewport.scale * 100)}%
-      </button>
-      <button type="button" className="chrome-icon" onClick={onZoomIn} aria-label="Zoom in">
-        +
-      </button>
-      <span className="zoom-meta">
-        {visibleCount}/{totalCount}
-      </span>
-    </div>
-  )
-}
-
-interface LibraryPanelProps {
-  open: boolean
-  unplaced: ObservableBlock[]
-  onToggle: () => void
-  onPlace: (blockId: string, index: number) => void
-}
-
-function LibraryPanel({ open, unplaced, onToggle, onPlace }: LibraryPanelProps) {
-  return (
-    <aside className={`library-dock${open ? ' is-open' : ''}`}>
-      <button
-        type="button"
-        className="library-tab"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls="board-library"
-      >
-        Library
-        <span className="library-count">{unplaced.length}</span>
-      </button>
-      {open && (
-        <div id="board-library" className="library-panel">
-          <div className="library-head">
-            <h2 className="library-title">Unplaced</h2>
-            <button type="button" className="chrome-icon library-close" onClick={onToggle} aria-label="Close library">
-              ×
-            </button>
-          </div>
-          {unplaced.length === 0 ? (
-            <p className="library-empty">Nothing waiting. New text lands on the canvas.</p>
-          ) : (
-            <ul className="library-list">
-              {unplaced.map((block, index) => (
-                <li key={block.id} className="library-item">
-                  <span className="library-item-title">{blockTitle(block)}</span>
-                  <button
-                    type="button"
-                    className="library-place"
-                    onClick={() => onPlace(block.id, index)}
-                  >
-                    Place
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </aside>
   )
 }
