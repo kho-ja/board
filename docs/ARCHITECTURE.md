@@ -1,9 +1,8 @@
 # Architecture
 
-> Status: **M0 + M1 + M2 implemented.** TanStack Start scaffold, the Postgres data
-> path, and the pan/zoom/drag infinite canvas are in place and verified. Notes
-> below now describe the running system; M3 (text block + in-place edit) builds on
-> it per START_PLAN.md.
+> Status: **M0–M3 implemented.** TanStack Start, the Postgres data path, the
+> pan/zoom/drag infinite canvas, and text-block rendering/editing are in place and
+> verified. M4 (file blocks + paste) is next per START_PLAN.md.
 
 ## Current state
 
@@ -19,7 +18,11 @@
   (world/screen math, culling), `ViewportProvider`/`useViewport`,
   `usePanZoom` (hot path in refs + rAF direct-DOM writes, cold commit on gesture
   end), `Canvas` (dot-grid world div + transformed container), `BlockShell`
-  (pointer-capture drag). Demo at `src/routes/demo/m2.tsx`.
+  (pointer-capture drag). The board is the root route at `src/routes/index.tsx`.
+- M3 text blocks complete and verified: `BlockRenderer` selects the block view;
+  `TextBlockView` renders through `@tanstack/markdown/react`; double-click opens the
+  textarea editor; Enter persists through the blocks collection and Escape/blur
+  cancels.
 - The documentation is the source of truth for the roadmap: see ROADMAP.md (scope)
   and DECISIONS.md + DESIGN.md (decisions and the core knowledge-model design).
 

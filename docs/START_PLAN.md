@@ -90,7 +90,7 @@ Postgres.
 - Verify: pan, zoom, drag block; position persists across reload.
 
 ### M3 — Text block (render + in-place edit)
-- TextBlockData `{ markdown }`; hand-rolled markdown-subset parser; double-click
+- TextBlockData `{ markdown }`; TanStack Markdown React renderer; double-click
   editor; BlockRenderer switch; update round-trips to server fn/Postgres.
 - Verify: dbl-click → edit → Escape → formatted render; persists.
 
@@ -185,7 +185,7 @@ interface SchemaDef  { id: SchemaId; name: string; fields: FieldDef[]; defaultVi
 | Edge/link lifecycle | cascade on unplace vs permanent delete | **Cascade on permanent delete only** | Yes |
 | Schema-edit UX | modal / panel / page | **Modal dialog for v1** | Yes |
 | File Group constraint | files only / any type | **Files only (locked)** — enforce in server fn validation | Yes |
-| Rich text lib | hand-rolled / ProseMirror / Lexical | **Hand-rolled markdown subset for v1** | Yes |
+| Rich text lib | TanStack Markdown / hand-rolled / ProseMirror / Lexical | **TanStack Markdown React renderer + textarea for v1** | Yes |
 | Sync/RT engine | QueryCollection vs ElectricSQL | **QueryCollection** (no Electric in v1; Electric only if realtime multi-user later) | Yes |
 
 ## 5. Verification Checklist (Run at Every Milestone)

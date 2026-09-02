@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import type { BlockData, Vec } from '#/types'
-import type { FileBlockData, FileGroupBlockData, ObjectBlockData, TextBlockData } from '#/types'
+import type { TextBlockData } from '#/types'
+import { TextBlockEditor } from '#/blocks/text/TextBlock'
+import { BlockRenderer } from './BlockRenderer'
 import { useViewport } from './ViewportProvider'
 
 export interface ObservableBlock {
@@ -24,22 +26,15 @@ interface BlockShellProps {
   block: ObservableBlock
   placement: ObservablePlacement
   onDragEnd: (position: Vec) => void
+  onCommitText?: (blockId: string, markdown: string) => void
 }
 
-export function blockTitle(block: ObservableBlock): string {
-  switch (block.kind) {
-    case 'text':
-      return (block.data as TextBlockData).markdown.trim() || 'Empty text block'
-    case 'file':
-      return (block.data as FileBlockData).name
-    case 'file-group':
-      return (block.data as FileGroupBlockData).name
-    default:
-      return (block.data as ObjectBlockData).schemaId
-  }
-}
-
-export function BlockShell({ block, placement, onDragEnd }: BlockShellProps) {
+export function BlockShell({
+  block,
+  placement,
+  onDragEnd,
+  onCommitText,
+}: BlockShellProps) {
   const { viewport } = useViewport()
 
   const elRef = useRef<HTMLDivElement>(null)
@@ -48,6 +43,7 @@ export function BlockShell({ block, placement, onDragEnd }: BlockShellProps) {
   const lastPosRef = useRef<Vec | null>(null)
   const dragRef = useRef<{ pointerId: number; startScreen: Vec; startWorld: Vec } | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   scaleRef.current = viewport.scale
 
@@ -66,7 +62,7 @@ export function BlockShell({ block, placement, onDragEnd }: BlockShellProps) {
   }
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return
+    if (e.button !== 0 || editing) return
     e.preventDefault()
     e.stopPropagation()
     dragRef.current = {
@@ -113,20 +109,48 @@ export function BlockShell({ block, placement, onDragEnd }: BlockShellProps) {
     }
   }
 
+  const enterEdit = () => {
+    if (block.kind !== 'text' || !onCommitText) return
+    setEditing(true)
+  }
+
+  const commitText = (markdown: string) => {
+    setEditing(false)
+    if (onCommitText && markdown.trim() !== (block.data as TextBlockData).markdown) {
+      onCommitText(block.id, markdown)
+    }
+  }
+
+  const isText = block.kind === 'text'
+
   return (
     <div
       ref={elRef}
-      className={`block-shell${dragging ? ' is-dragging' : ''}`}
+      className={`block-shell${isText ? ' is-text' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}`}
       style={{ left: placement.positionX, top: placement.positionY }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(e) => finishDrag(e, true)}
       onPointerCancel={(e) => finishDrag(e, false)}
+      onDoubleClick={enterEdit}
+      title={isText ? 'Double-click to edit' : undefined}
     >
-      <p className="block-title">{blockTitle(block)}</p>
-      <p className="block-muted">
-        {block.kind} · {block.id.slice(0, 8)} · v{block.schemaVersion}
-      </p>
+      {editing ? (
+        <TextBlockEditor
+          data={block.data as TextBlockData}
+          onCommit={commitText}
+          onCancel={() => setEditing(false)}
+        />
+      ) : (
+        <>
+          <BlockRenderer block={block} />
+          {!isText && (
+            <p className="block-muted">
+              {block.kind} · {block.id.slice(0, 8)} · v{block.schemaVersion}
+            </p>
+          )}
+        </>
+      )}
     </div>
   )
 }

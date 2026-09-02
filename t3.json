@@ -1,0 +1,55 @@
+{
+  "$schema": "https://t3.codes/schema/t3.json",
+  "scripts": [
+    {
+      "name": "Start Dev Server",
+      "command": "npm run dev",
+      "icon": "play",
+      "runOnWorktreeCreate": false,
+      "previewUrl": "http://localhost:3000",
+      "autoOpenPreview": true
+    },
+    {
+      "name": "Typecheck",
+      "command": "npx tsc --noEmit",
+      "icon": "lint",
+      "runOnWorktreeCreate": false
+    },
+    {
+      "name": "Lint",
+      "command": "npm run lint",
+      "icon": "lint",
+      "runOnWorktreeCreate": false
+    },
+    {
+      "name": "Build",
+      "command": "npm run build",
+      "icon": "build",
+      "runOnWorktreeCreate": false
+    },
+    {
+      "name": "Check Gates",
+      "command": "npx tsc --noEmit && npm run lint && npm run build",
+      "icon": "build",
+      "runOnWorktreeCreate": false
+    },
+    {
+      "name": "Check Blockers",
+      "command": "node scripts/check-blockers.mjs",
+      "icon": "debug",
+      "runOnWorktreeCreate": false
+    },
+    {
+      "name": "DB Push (schema)",
+      "command": "npm run db:push",
+      "icon": "configure",
+      "runOnWorktreeCreate": false
+    },
+    {
+      "name": "DB Studio",
+      "command": "npm run db:studio",
+      "icon": "configure",
+      "runOnWorktreeCreate": false
+    }
+  ]
+}
