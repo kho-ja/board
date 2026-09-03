@@ -229,15 +229,14 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
     [collections],
   )
 
-  const placeAt = (blockId: string, index: number) => {
-    const origin = viewCenter()
+  const placeBlockAt = (blockId: string, world: Vec) => {
+    const existing = placements.find((p) => p.blockId === blockId)
+    if (existing) return
     const size = sizeForBlock(byId.get(blockId)?.kind ?? '')
-    const col = index % 5
-    const row = Math.floor(index / 5)
     collections.placementsCollection.insert({
       blockId,
-      positionX: Math.round(origin.x - size.width / 2 + col * GRID_SPACING),
-      positionY: Math.round(origin.y - size.height / 2 + row * GRID_SPACING),
+      positionX: Math.round(world.x - size.width / 2),
+      positionY: Math.round(world.y - size.height / 2),
     })
     setSelectedIds(new Set([blockId]))
     setTool('move')
@@ -494,7 +493,6 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
           unplaced={unplaced}
           selectedIds={selectedIds}
           onSelect={selectOnly}
-          onPlace={placeAt}
         />
         <div className="canvas-area">
           <Canvas
@@ -505,6 +503,7 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
             onPress={onPress}
             onMarquee={onMarquee}
             onImportFiles={onImportFiles}
+            onPlaceBlockAt={placeBlockAt}
           >
             {placedBlocks.map(({ placement, block }) => (
               <BlockShell
