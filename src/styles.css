@@ -459,7 +459,6 @@ a {
   flex: none;
   width: 232px;
   overflow: auto;
-  border-left: 1px solid var(--line);
   background: color-mix(in oklab, var(--surface-strong) 90%, transparent);
   backdrop-filter: blur(12px);
   padding: 0.75rem;
@@ -682,9 +681,12 @@ a {
 }
 
 /* Figma-style text layers: plain text with no card chrome. Selection shows a
-   subtle outline around the text extent instead of a filled box. */
+   subtle outline around the text extent instead of a filled box.
+   width: max-content (not fit-content) sizes to the widest intrinsic line so
+   overflow-wrap:anywhere doesn't collapse the block to a single-character
+   column; max-width still allows wrapping for long or multiline text. */
 .block-shell.is-text {
-  width: fit-content;
+  width: max-content;
   max-width: 340px;
   border: 0;
   background: none;
