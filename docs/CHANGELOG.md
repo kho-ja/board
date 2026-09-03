@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-09-03 — Ctrl+Z undo / Ctrl+Shift+Z redo for board mutations
+
+- Added an **action-based undo stack** (`src/hooks/useUndoRedo.ts`):
+  `runRecorded(label, apply, undo, redo)` executes the forward mutation and
+  registers a pair of closures that replay the inverse (undo) and forward
+  (redo) mutations through the same TanStack DB collections. `undo()`/`redo()`
+  replay the captured closures and are themselves never re-recorded, so replay
+  doesn't nest. The stack is trackable via `canUndo`/`canRedo`.
+- **Wired into the canvas keydown handler:** `Ctrl/Cmd+Z` → undo,
+  `Ctrl/Cmd+Shift+Z` **and** `Ctrl/Cmd+Y` → redo. These are intercepted before
+  the existing modifier early-return, and the `isTyping()` guard (INPUT /
+  TEXTAREA / contenteditable) still applies, so undo works while typing in an
+  editor is unaffected.
+- **Every reversible mutation now records an action:** move / set position
+  (drag-end, X/Y inputs), text commit, add text, drag-to-place, import files
+  (and add-files-to-group), create group, group card/list view toggle, rename
+  group, remove-from-board, and delete group (undo restores the group's
+  memberships and placement; blocks are references and are never deleted).
+- Verified in the browser: create a File Group → `Ctrl+Z` removes it (back to
+  44 placed · 46 total from 45 · 47) → `Ctrl+Shift+Z` restores it, with no
+  console errors. `npm run tsc`, `npm run lint`, and `npm run build` pass.
+
 ## 2026-09-02 — M6: File Group blocks (create, drop-to-add, view toggle, delete)
 
 - **File Group block** (`file-group`): a placed block that renders its members as
