@@ -11,7 +11,6 @@ interface LeftDockProps {
   unplaced: ObservableBlock[]
   selectedIds: ReadonlySet<string>
   onSelect: (blockId: string) => void
-  onPlace: (blockId: string, index: number) => void
 }
 
 export function LeftDock({
@@ -19,7 +18,6 @@ export function LeftDock({
   unplaced,
   selectedIds,
   onSelect,
-  onPlace,
 }: LeftDockProps) {
   const [tab, setTab] = useState<Tab>('layers')
 
@@ -68,7 +66,8 @@ export function LeftDock({
                     <span className="layer-chip" aria-hidden="true" />
                     <span className="layer-name">{blockTitle(block)}</span>
                     <span className="layer-pos">
-                      {Math.round(placement.positionX)}, {Math.round(placement.positionY)}
+                      {Math.round(placement.positionX)},{' '}
+                      {Math.round(placement.positionY)}
                     </span>
                   </button>
                 </li>
@@ -78,19 +77,26 @@ export function LeftDock({
         ) : (
           <DockList>
             {unplaced.length === 0 ? (
-              <p className="dock-empty">Nothing waiting. New text lands on the canvas.</p>
+              <p className="dock-empty">
+                Nothing waiting. New text lands on the canvas.
+              </p>
             ) : (
-              unplaced.map((block, index) => (
+              unplaced.map((block) => (
                 <li key={block.id}>
-                  <button
-                    type="button"
+                  <div
                     className="asset-row"
-                    onClick={() => onPlace(block.id, index)}
+                    draggable="true"
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        'application/x-khoja-block-id',
+                        block.id,
+                      )
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
                   >
                     <span className="layer-chip" aria-hidden="true" />
                     <span className="layer-name">{blockTitle(block)}</span>
-                    <span className="asset-place">Place</span>
-                  </button>
+                  </div>
                 </li>
               ))
             )}

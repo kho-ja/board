@@ -403,8 +403,19 @@ a {
   padding: 0.4rem 0.4rem;
   font: inherit;
   font-size: 0.74rem;
-  cursor: pointer;
   text-align: left;
+}
+
+.layer-row {
+  cursor: pointer;
+}
+
+.asset-row {
+  cursor: grab;
+}
+
+.asset-row:active {
+  cursor: grabbing;
 }
 
 .layer-row:hover,
@@ -438,18 +449,6 @@ a {
   font-size: 0.64rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.asset-place {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: color-mix(in oklab, var(--lagoon) 16%, var(--surface-strong));
-  color: var(--sea-ink);
-  padding: 0.2rem 0.45rem;
-  font: inherit;
-  font-size: 0.64rem;
-  font-weight: 700;
   white-space: nowrap;
 }
 
