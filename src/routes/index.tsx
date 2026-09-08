@@ -9,6 +9,8 @@ import type {
   ObservablePlacement,
 } from '#/components/canvas/BlockShell'
 import type { DropTarget } from '#/components/canvas/BlockShell'
+import { LinksLayer } from '#/components/canvas/LinksLayer'
+import type { PortSide, Rect } from '#/lib/canvas/geometry'
 import { Canvas } from '#/components/canvas/Canvas'
 import { ViewportProvider, useViewport } from '#/components/canvas/ViewportProvider'
 import { ToolRail } from '#/components/canvas/ToolRail'
@@ -35,6 +37,7 @@ import type {
   FieldValue,
   FileGroupBlockData,
   ObjectBlockData,
+  ObservableLink,
   SchemaDef,
   TextBlockData,
 } from '#/types'
@@ -48,6 +51,7 @@ export const Route = createFileRoute('/')({
       context.collections.placementsCollection.preload(),
       context.collections.membershipsCollection.preload(),
       context.collections.typesCollection.preload(),
+      context.collections.linksCollection.preload(),
     ])
     return null
   },
@@ -112,6 +116,10 @@ function BoardPage() {
     query: (q) => q.from({ type: collections.typesCollection }),
   })
 
+  const { data: links } = useLiveQuery({
+    query: (q) => q.from({ link: collections.linksCollection }),
+  })
+
   const placedIds = useMemo(() => new Set(placements.map((p) => p.blockId)), [placements])
   const unplaced = useMemo(
     () => blocks.filter((block) => !placedIds.has(block.id)),
@@ -124,6 +132,7 @@ function BoardPage() {
         blocks={blocks}
         placements={placements}
         memberships={memberships}
+        links={links}
         unplaced={unplaced}
         types={types}
         collections={collections}
@@ -136,16 +145,21 @@ interface BoardProps {
   blocks: ObservableBlock[]
   placements: ObservablePlacement[]
   memberships: ObservableMembership[]
+  links: ObservableLink[]
   unplaced: ObservableBlock[]
   types: SchemaDef[]
   collections: Collections
 }
 
-function Board({ blocks, placements, memberships, unplaced, types, collections }: BoardProps) {
+function Board({ blocks, placements, memberships, links, unplaced, types, collections }: BoardProps) {
   const { ref: containerRef, width, height } = useElementSize<HTMLDivElement>()
   const { viewport, setViewport } = useViewport()
   const [tool, setTool] = useState<Tool>('move')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
+  const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null)
+  const [draftLink, setDraftLink] = useState<{ fromBlockId: string; currentPos: Vec } | null>(null)
+  const [livePositions, setLivePositions] = useState<Map<string, Vec>>(() => new Map())
   const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types'>('layers')
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [activeDrop, setActiveDrop] = useState<DropTarget | null>(null)
@@ -290,9 +304,18 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
     [byId, placements, selectedIds],
   )
 
-  const selectOnly = useCallback((id: string) => setSelectedIds(new Set([id])), [])
+  const onSelectLink = useCallback((id: string | null) => {
+    setSelectedLinkId(id)
+    if (id) setSelectedIds(new Set())
+  }, [])
+
+  const selectOnly = useCallback((id: string) => {
+    setSelectedLinkId(null)
+    setSelectedIds(new Set([id]))
+  }, [])
 
   const toggleSelect = useCallback((id: string) => {
+    setSelectedLinkId(null)
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -419,7 +442,165 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
   )
 
 
+
+  const handleDragMove = useCallback((blockId: string, pos: Vec) => {
+    setLivePositions((prev) => {
+      const next = new Map(prev)
+      next.set(blockId, pos)
+      return next
+    })
+  }, [])
+
+  const getBlockRect = useCallback(
+    (blockId: string): Rect | null => {
+      const live = livePositions.get(blockId)
+      const placement = placements.find((p) => p.blockId === blockId)
+      if (!live && !placement) return null
+      const block = byId.get(blockId)
+      const kind = block?.kind ?? ''
+      const size = sizeForBlock(kind)
+      const x = live ? live.x : placement!.positionX
+      const y = live ? live.y : placement!.positionY
+      return { x, y, width: size.width, height: size.height }
+    },
+    [byId, livePositions, placements],
+  )
+
+  const handleCreateLink = useCallback(
+    (blockAId: string, blockBId: string) => {
+      if (blockAId === blockBId) return
+      const exists = links.some(
+        (l) =>
+          (l.blockAId === blockAId && l.blockBId === blockBId) ||
+          (l.blockAId === blockBId && l.blockBId === blockAId),
+      )
+      if (exists) return
+
+      const id = crypto.randomUUID()
+      const link: ObservableLink = {
+        id,
+        blockAId,
+        blockBId,
+        createdAt: new Date(),
+      }
+
+      runRecorded(
+        'Connect blocks',
+        () => {
+          collections.linksCollection.insert(link)
+        },
+        () => {
+          collections.linksCollection.delete(id)
+        },
+        () => {
+          collections.linksCollection.insert(link)
+        },
+      )
+      setSelectedLinkId(id)
+      setSelectedIds(new Set())
+    },
+    [collections, links, runRecorded],
+  )
+
+  const handleDeleteLink = useCallback(
+    (linkId: string) => {
+      const target = links.find((l) => l.id === linkId)
+      if (!target) return
+      runRecorded(
+        'Delete connection',
+        () => {
+          collections.linksCollection.delete(linkId)
+        },
+        () => {
+          collections.linksCollection.insert(target)
+        },
+        () => {
+          collections.linksCollection.delete(linkId)
+        },
+      )
+      setSelectedLinkId((prev) => (prev === linkId ? null : prev))
+    },
+    [collections, links, runRecorded],
+  )
+
+  const handleConnectClick = useCallback(
+    (blockId: string) => {
+      if (!draftLink) {
+        const rect = getBlockRect(blockId)
+        const center = rect
+          ? { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+          : viewCenter()
+        setDraftLink({ fromBlockId: blockId, currentPos: center })
+      } else {
+        if (draftLink.fromBlockId !== blockId) {
+          handleCreateLink(draftLink.fromBlockId, blockId)
+        }
+        setDraftLink(null)
+      }
+    },
+    [draftLink, getBlockRect, handleCreateLink, viewCenter],
+  )
+
+  const handleStartConnect = useCallback(
+    (blockId: string, _side: PortSide, screenPos: Vec) => {
+      const rect = containerRef.current?.getBoundingClientRect()
+      const worldPos = rect
+        ? screenToWorld(viewport, { x: screenPos.x - rect.left, y: screenPos.y - rect.top })
+        : viewCenter()
+      setDraftLink({ fromBlockId: blockId, currentPos: worldPos })
+    },
+    [containerRef, viewCenter, viewport],
+  )
+
+  useEffect(() => {
+    if (!draftLink) return
+
+    const onPointerMove = (e: PointerEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const worldPos = screenToWorld(viewport, {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      })
+      setDraftLink((prev) => (prev ? { ...prev, currentPos: worldPos } : null))
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      const target = (e.target as HTMLElement | null)?.closest?.('[data-block-id]')
+      const targetId = target?.getAttribute('data-block-id')
+      if (targetId && targetId !== draftLink.fromBlockId) {
+        handleCreateLink(draftLink.fromBlockId, targetId)
+        setDraftLink(null)
+      }
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [containerRef, draftLink, handleCreateLink, viewport])
+
+  const selectedLink = useMemo(() => {
+    if (!selectedLinkId) return null
+    const link = links.find((l) => l.id === selectedLinkId)
+    if (!link) return null
+    return {
+      link,
+      blockA: byId.get(link.blockAId),
+      blockB: byId.get(link.blockBId),
+    }
+  }, [byId, links, selectedLinkId])
+
   const handleDragEnd = (blockId: string, position: Vec) => {
+    setLivePositions((prev) => {
+      if (!prev.has(blockId)) return prev
+      const next = new Map(prev)
+      next.delete(blockId)
+      return next
+    })
+
     const existing = placements.find((p) => p.blockId === blockId)
     if (existing) {
       const prevX = existing.positionX
@@ -993,6 +1174,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
       const toDeleteBlocks: ObservableBlock[] = []
       const toDeletePlacements: ObservablePlacement[] = []
       const toDeleteMemberships: ObservableMembership[] = []
+      const toDeleteLinks: ObservableLink[] = []
 
       for (const id of ids) {
         const block = byId.get(id)
@@ -1008,6 +1190,14 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
             }
           }
         }
+
+        for (const l of links) {
+          if (l.blockAId === id || l.blockBId === id) {
+            if (!toDeleteLinks.some((existing) => existing.id === l.id)) {
+              toDeleteLinks.push(l)
+            }
+          }
+        }
       }
 
       if (toDeleteBlocks.length === 0) return
@@ -1020,6 +1210,9 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
       runRecorded(
         label,
         () => {
+          for (const l of toDeleteLinks) {
+            collections.linksCollection.delete(l.id)
+          }
           for (const m of toDeleteMemberships) {
             collections.membershipsCollection.delete(m.id)
           }
@@ -1040,8 +1233,14 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
           for (const m of toDeleteMemberships) {
             collections.membershipsCollection.insert(m)
           }
+          for (const l of toDeleteLinks) {
+            collections.linksCollection.insert(l)
+          }
         },
         () => {
+          for (const l of toDeleteLinks) {
+            collections.linksCollection.delete(l.id)
+          }
           for (const m of toDeleteMemberships) {
             collections.membershipsCollection.delete(m.id)
           }
@@ -1059,8 +1258,11 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
         for (const b of toDeleteBlocks) next.delete(b.id)
         return next
       })
+      if (selectedLinkId && toDeleteLinks.some((l) => l.id === selectedLinkId)) {
+        setSelectedLinkId(null)
+      }
     },
-    [byId, collections, memberships, placements, runRecorded],
+    [byId, collections, links, memberships, placements, runRecorded, selectedLinkId],
   )
 
   const handleDeleteBlock = useCallback(
@@ -1114,15 +1316,25 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
       if (key === 'v') setTool('move')
       else if (key === 'h') setTool('hand')
       else if (key === 't') setTool('text')
+      else if (key === 'c') setTool('link')
       else if (key === 'a') {
         setDockTab((prev) => (prev === 'assets' ? 'layers' : 'assets'))
       } else if (key === 'escape') {
-        setTool('move')
-        setSelectedIds(new Set())
+        if (draftLink) {
+          setDraftLink(null)
+        } else if (selectedLinkId) {
+          setSelectedLinkId(null)
+        } else {
+          setTool('move')
+          setSelectedIds(new Set())
+        }
       }
 
       if (key === 'backspace' || key === 'delete') {
-        if (selectedIds.size > 0) {
+        if (selectedLinkId) {
+          event.preventDefault()
+          handleDeleteLink(selectedLinkId)
+        } else if (selectedIds.size > 0) {
           event.preventDefault()
           handleUnplaceBlocks(selectedIds)
         }
@@ -1161,7 +1373,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('paste', onPaste)
     }
-  }, [undo, redo, selectedIds, handleUnplaceBlocks, importFiles, viewCenter, addTextAt])
+  }, [undo, redo, selectedIds, handleUnplaceBlocks, importFiles, viewCenter, addTextAt, draftLink, handleDeleteLink, selectedLinkId])
 
   const onPress = useCallback(
     (world: Vec) => {
@@ -1177,6 +1389,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
   // (no drag) reports `null`, which clears the selection.
   const onMarquee = useCallback(
     (world: WorldRect | null) => {
+      setSelectedLinkId(null)
       if (!world) {
         setSelectedIds(new Set())
         return
@@ -1245,6 +1458,15 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
             onPlaceBlockAt={placeBlockAt}
             onRemoveFromGroup={handleRemoveFromGroup}
           >
+            <LinksLayer
+              links={links}
+              getBlockRect={getBlockRect}
+              selectedLinkId={selectedLinkId}
+              hoveredLinkId={hoveredLinkId}
+              onSelectLink={onSelectLink}
+              onHoverLink={setHoveredLinkId}
+              draftLink={draftLink}
+            />
             {placedBlocks.map(({ placement, block }) => (
               <BlockShell
                 key={block.id}
@@ -1254,6 +1476,12 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
                   typesById.get(block.kind) ??
                   typesById.get((block.data as ObjectBlockData).schemaId)
                 }
+                tool={tool}
+                isConnecting={draftLink !== null}
+                isConnectSource={draftLink?.fromBlockId === block.id}
+                onConnectClick={handleConnectClick}
+                onStartConnect={handleStartConnect}
+                onDragMove={handleDragMove}
                 onDragEnd={(position) => handleDragEnd(block.id, position)}
                 onCommitText={commitText}
                 onSelect={selectOnly}
@@ -1276,6 +1504,8 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
         </div>
         <Inspector
           selected={selectedBlocks}
+          selectedLink={selectedLink}
+          onDeleteLink={handleDeleteLink}
           types={types}
           onUpdatePosition={handleUpdatePosition}
           onUnplace={handleUnplace}

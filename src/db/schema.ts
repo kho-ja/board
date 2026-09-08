@@ -48,6 +48,21 @@ export const memberships = pgTable(
   (t) => [uniqueIndex('memberships_unique_pair').on(t.groupId, t.memberId)],
 )
 
+export const links = pgTable(
+  'links',
+  {
+    id: text().primaryKey(),
+    blockAId: text('block_a_id')
+      .notNull()
+      .references(() => blocks.id, { onDelete: 'cascade' }),
+    blockBId: text('block_b_id')
+      .notNull()
+      .references(() => blocks.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('links_unique_pair').on(t.blockAId, t.blockBId)],
+)
+
 export const types = pgTable('types', {
   id: text().primaryKey(),
   name: text().notNull(),

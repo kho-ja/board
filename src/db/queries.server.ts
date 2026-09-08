@@ -1,7 +1,7 @@
 import { asc, desc, eq } from 'drizzle-orm'
 
 import { db } from '#/db/index'
-import { blocks, memberships, placements, types, views } from '#/db/schema'
+import { blocks, links, memberships, placements, types, views } from '#/db/schema'
 
 export type BlockRow = typeof blocks.$inferSelect
 export type BlockInsert = typeof blocks.$inferInsert
@@ -11,6 +11,9 @@ export type PlacementInsert = typeof placements.$inferInsert
 
 export type MembershipRow = typeof memberships.$inferSelect
 export type MembershipInsert = typeof memberships.$inferInsert
+
+export type LinkRow = typeof links.$inferSelect
+export type LinkInsert = typeof links.$inferInsert
 
 export type TypeRow = typeof types.$inferSelect
 export type TypeInsert = typeof types.$inferInsert
@@ -117,4 +120,17 @@ export async function updateView(id: string, changes: Partial<ViewRow>) {
 
 export async function deleteView(id: string) {
   return db.delete(views).where(eq(views.id, id)).returning()
+}
+// ---------- Links ----------
+
+export async function listLinks() {
+  return db.query.links.findMany()
+}
+
+export async function insertLink(values: LinkInsert) {
+  return db.insert(links).values(values).onConflictDoNothing().returning()
+}
+
+export async function deleteLink(id: string) {
+  return db.delete(links).where(eq(links.id, id)).returning()
 }

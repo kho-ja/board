@@ -71,6 +71,13 @@ export const MembershipSchema = z.object({
   createdAt: z.coerce.date().optional(),
 })
 
+export const LinkSchema = z.object({
+  id: z.string(),
+  blockAId: z.string(),
+  blockBId: z.string(),
+  createdAt: z.coerce.date().optional(),
+})
+
 export const FieldDefSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -106,3 +113,4 @@ export const ViewSchema = z.object({
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
 })
+

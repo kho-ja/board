@@ -3,10 +3,12 @@ import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent } f
 
 import type { BlockData, FileGroupBlockData, SchemaDef, Vec } from '#/types'
 import type { TextBlockData } from '#/types'
+import type { PortSide } from '#/lib/canvas/geometry'
 import { TextBlockEditor } from '#/blocks/text/TextBlock'
 
 import { BlockRenderer } from './BlockRenderer'
 import { useViewport } from './ViewportProvider'
+import type { Tool } from './tools'
 
 const BLOCK_ID_MIME = 'application/x-khoja-block-id'
 
@@ -39,6 +41,13 @@ interface BlockShellProps {
   block: ObservableBlock
   placement: ObservablePlacement
   schema?: SchemaDef | null
+  tool?: Tool
+  isConnecting?: boolean
+  isConnectSource?: boolean
+  isConnectTarget?: boolean
+  onConnectClick?: (blockId: string) => void
+  onStartConnect?: (blockId: string, side: PortSide, screenPos: Vec) => void
+  onDragMove?: (blockId: string, pos: Vec) => void
   onDragEnd: (position: Vec) => void
   onCommitText?: (blockId: string, markdown: string) => void
   onSelect?: (blockId: string) => void
@@ -72,6 +81,13 @@ export function BlockShell({
   block,
   placement,
   schema,
+  tool,
+  isConnecting = false,
+  isConnectSource = false,
+  isConnectTarget = false,
+  onConnectClick,
+  onStartConnect,
+  onDragMove,
   onDragEnd,
   onCommitText,
   onSelect,
@@ -120,6 +136,12 @@ export function BlockShell({
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || editing) return
 
+    if (tool === 'link' || isConnecting) {
+      e.stopPropagation()
+      onConnectClick?.(block.id)
+      return
+    }
+
     // Modifier-click toggles membership without starting a drag (Figma-like
     // additive selection with ctrl/cmd; we also accept shift).
     if (e.metaKey || e.ctrlKey || e.shiftKey) {
@@ -161,6 +183,7 @@ export function BlockShell({
         rafRef.current = null
         if (lastPosRef.current) {
           applyPosition(lastPosRef.current)
+          onDragMove?.(block.id, lastPosRef.current)
           if (computeDropTarget && lastClientRef.current) {
             const target = computeDropTarget(
               lastPosRef.current,
@@ -298,7 +321,7 @@ export function BlockShell({
   return (
     <div
       ref={elRef}
-      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}`}
+      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}${isConnectSource ? ' is-connecting-source' : ''}${isConnectTarget ? ' is-connect-target' : ''}`}
       style={{ left: placement.positionX, top: placement.positionY }}
       data-block-id={block.id}
       onPointerDown={onPointerDown}
@@ -335,6 +358,38 @@ export function BlockShell({
               {Math.round(placement.positionX)}, {Math.round(placement.positionY)}
             </p>
           )}
+          <div
+            className="block-port block-port-top"
+            title="Connect"
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              onStartConnect?.(block.id, 'top', { x: e.clientX, y: e.clientY })
+            }}
+          />
+          <div
+            className="block-port block-port-right"
+            title="Connect"
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              onStartConnect?.(block.id, 'right', { x: e.clientX, y: e.clientY })
+            }}
+          />
+          <div
+            className="block-port block-port-bottom"
+            title="Connect"
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              onStartConnect?.(block.id, 'bottom', { x: e.clientX, y: e.clientY })
+            }}
+          />
+          <div
+            className="block-port block-port-left"
+            title="Connect"
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              onStartConnect?.(block.id, 'left', { x: e.clientX, y: e.clientY })
+            }}
+          />
         </>
       )}
     </div>

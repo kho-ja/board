@@ -64,18 +64,21 @@ things are done before they are done.
   (`A` toggle dock, `S` cycle sort, `↑`/`↓` navigate, `Enter` place, `Del` delete), and
   explicit "Place files" affordances in both top bar and Assets dock.
 
+## Completed
+
+- **M9 — v1 Relationships ("Link with a Line"):** simple, untyped visual connections
+  between blocks. Added `links` table with foreign-key cascades in Postgres, TanStack DB
+  reactive `linksCollection`, SVG bezier curve routing (`LinksLayer`), interactive cardinal
+  port handles on blocks, Connector Tool (`C` hotkey) with live animated draft preview,
+  real-time line re-routing during drag, link selection/inspection, cascade deletion, and
+  full undo/redo integration.
+
 ## In progress
 
-- **M9 — v1 Relationships ("Link with a Line"):** connecting blocks with visual lines.
+- None (Milestone 9 completed).
 
 ## Next (in rough order)
 
-0. **M9 — v1 Relationships ("Link with a Line"):**
-   - Link data model (`links` table in Postgres + `links` collection in TanStack DB).
-   - SVG interactive connector overlay layer with smooth Bezier / orthogonal routing.
-   - Connector Tool (`C` / `L` hotkey) and block connection anchor handles.
-   - Dynamic real-time re-routing as connected blocks are moved on canvas.
-   - Link selection, hover effects, and deletion with atomic undo/redo.
 1. **M10 — Multi-Block Group Drag & Layout Tools:**
    - Moving any block in a multi-selection shifts all selected placements together.
    - Selection alignment tools (Align Left/Right/Top/Bottom, Distribute).

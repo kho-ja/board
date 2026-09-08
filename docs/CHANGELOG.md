@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-09-08 — M9: v1 Relationships ("Link with a Line")
+
+- **PostgreSQL Database Schema & Server Functions for Links**: Added `links` table
+  with `id`, `block_a_id`, `block_b_id`, `created_at`, foreign-key constraints cascading on
+  block deletion, and a unique composite index. Pushed schema changes to Postgres via
+  Drizzle Kit.
+- **TanStack DB Reactive Collection**: Created `linksCollection` (`src/collections/links.ts`)
+  supporting live queries, optimistic insertion, and deletion.
+- **Canvas Geometry & Bezier Curve Routing** (`src/lib/canvas/geometry.ts`): Added
+  automatic connection anchor calculation choosing optimal cardinal ports (top, bottom,
+  left, right) with directional penalties, smooth cubic Bezier paths, and quadratic preview
+  paths. Added unit tests for anchor calculations and schema validation.
+- **Connector Tool & Interactive Affordances**:
+  - Added Connector tool to ToolRail with hotkey `C`.
+  - Cardinal port handles on blocks that appear on hover or when Connector tool is active.
+  - Interactive click-to-connect and drag-to-connect affordances with real-time animated
+    dashed draft line.
+  - Real-time line tracking as connected blocks are dragged across the canvas at 60fps.
+- **Link Selection & Inspector Panel**:
+  - Click on connection line selects it with glow filter and highlight halo.
+  - Dedicated Relationship Inspector panel displaying source and target block names and a
+    "Delete connection" action.
+  - Keyboard deletion via `Delete` / `Backspace` when link is selected.
+  - Automatic cascade deletion of attached links when blocks are permanently deleted.
+  - All link additions and deletions fully recorded in `useUndoRedo` stack for atomic
+    `Ctrl+Z` / `Ctrl+Shift+Z`.
+
 ## 2026-09-08 — Asset categorization, sort modes, keyboard navigation, and Place Files affordance
 
 - **Asset Category System** (`src/lib/assets/categories.ts`): Added smart classification
