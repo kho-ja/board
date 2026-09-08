@@ -2,26 +2,32 @@ import { useRef } from 'react'
 
 interface FileImportProps {
   onPick: (files: File[]) => void
+  label?: string
+  className?: string
 }
 
 /**
- * Visible "Paste files" affordance: a button that opens a hidden multiple-file
+ * Visible "Place files" affordance: a button that opens a hidden multiple-file
  * picker. Metadata-only — the bytes never leave the browser. Shared import
  * logic lives in the board route (`importFiles`); this mirror path complements
  * the whole-canvas drop zone.
  */
-export function FileImport({ onPick }: FileImportProps) {
+export function FileImport({
+  onPick,
+  label = 'Place files',
+  className = 'file-import-button',
+}: FileImportProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
     <>
       <button
         type="button"
-        className="file-import-button"
+        className={className}
         onClick={() => inputRef.current?.click()}
-        title="Pick files to add to the board"
+        title="Pick files to place on the board"
       >
-        Paste files
+        {label}
       </button>
       <input
         ref={inputRef}

@@ -1228,6 +1228,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
           onSelect={selectOnly}
           onPlaceAsset={handlePlaceAsset}
           onDeleteAsset={handleDeleteBlock}
+          onPickFiles={pickFiles}
           onOpenSchemaCreator={handleOpenSchemaCreator}
           onCreateInstance={handleCreateInstance}
           onDeleteType={handleDeleteType}

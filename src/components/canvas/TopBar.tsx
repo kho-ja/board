@@ -22,7 +22,7 @@ export function TopBar({
         </div>
       </div>
       <div className="topbar-actions">
-        <span className="topbar-hint">V Move · H Hand · T Text · Space pan</span>
+        <span className="topbar-hint">V Move · H Hand · T Text · A Assets · Space pan</span>
         {onCreateType && (
           <button
             type="button"
@@ -43,7 +43,7 @@ export function TopBar({
             File Group
           </button>
         )}
-        {onPickFiles && <FileImport onPick={onPickFiles} />}
+        {onPickFiles && <FileImport onPick={onPickFiles} label="Place files" />}
         <ThemeToggle className="theme-toggle" />
       </div>
     </header>
