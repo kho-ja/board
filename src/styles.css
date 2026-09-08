@@ -428,6 +428,27 @@ a {
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 40%, transparent) inset;
 }
 
+.dock-list:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
+  border-radius: 7px;
+}
+
+.layer-row[data-active='true'],
+.asset-row[data-active='true'] {
+  background: color-mix(in oklab, var(--lagoon) 16%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 30%, transparent) inset;
+}
+
+.layer-row[data-active='true'].is-selected {
+  background: color-mix(in oklab, var(--lagoon) 24%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 55%, transparent) inset;
+}
+
+.asset-row[data-active='true'] {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 50%, transparent);
+}
+
 .layer-chip {
   flex: none;
   width: 9px;

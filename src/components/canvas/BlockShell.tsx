@@ -8,6 +8,11 @@ import { TextBlockEditor } from '#/blocks/text/TextBlock'
 import { BlockRenderer } from './BlockRenderer'
 import { useViewport } from './ViewportProvider'
 
+const BLOCK_ID_MIME = 'application/x-khoja-block-id'
+
+/** Where a drag should land, resolved by the route during a pointer drag. */
+export type DropTarget = { type: 'group'; groupId: string }
+
 export interface ObservableBlock {
   id: string
   kind: string
@@ -46,10 +51,19 @@ interface BlockShellProps {
     files: File[],
     dropPoint: Vec,
   ) => void
+  computeDropTarget?: (
+    world: Vec,
+    client: Vec,
+    blockId: string,
+  ) => DropTarget | null
+  onDropTargetChange?: (target: DropTarget | null) => void
+  onDropBlockOnGroup?: (groupId: string, blockId: string, client: Vec) => void
+  isGroupDropTarget?: boolean
 }
 
-function hasFiles(e: ReactDragEvent<HTMLElement>): boolean {
-  return Array.from(e.dataTransfer.types).includes('Files')
+function groupAcceptsDrop(e: ReactDragEvent<HTMLElement>): boolean {
+  const types = Array.from(e.dataTransfer.types)
+  return types.includes('Files') || types.includes(BLOCK_ID_MIME)
 }
 
 export function BlockShell({
@@ -64,6 +78,10 @@ export function BlockShell({
   onGroupViewChange,
   onMemberClick,
   onDropFilesOnGroup,
+  computeDropTarget,
+  onDropTargetChange,
+  onDropBlockOnGroup,
+  isGroupDropTarget = false,
 }: BlockShellProps) {
   const { viewport } = useViewport()
 
@@ -76,6 +94,8 @@ export function BlockShell({
   const [editing, setEditing] = useState(false)
   const [dragTarget, setDragTarget] = useState(false)
   const dragDepthRef = useRef(0)
+  const lastClientRef = useRef<Vec | null>(null)
+  const dropTargetRef = useRef<DropTarget | null>(null)
 
   scaleRef.current = viewport.scale
 
@@ -114,6 +134,10 @@ export function BlockShell({
       startWorld: { x: placement.positionX, y: placement.positionY },
     }
     lastPosRef.current = null
+    lastClientRef.current = null
+    dropTargetRef.current = null
+    onDropTargetChange?.(null)
+    setDragTarget(false)
     e.currentTarget.setPointerCapture(e.pointerId)
     setDragging(true)
   }
@@ -127,6 +151,22 @@ export function BlockShell({
       y: drag.startWorld.y + (e.clientY - drag.startScreen.y) / scaleRef.current,
     }
     lastPosRef.current = position
+    lastClientRef.current = { x: e.clientX, y: e.clientY }
+    const target =
+      computeDropTarget?.(position, { x: e.clientX, y: e.clientY }, block.id) ??
+      null
+    const prev = dropTargetRef.current
+    const same =
+      (target === null && prev === null) ||
+      (target !== null &&
+        prev !== null &&
+        target.type === prev.type &&
+        (target.type !== 'group' ||
+          target.groupId === (prev as { groupId: string }).groupId))
+    if (!same) {
+      dropTargetRef.current = target
+      onDropTargetChange?.(target)
+    }
     if (rafRef.current == null) {
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null
@@ -146,7 +186,25 @@ export function BlockShell({
     } catch {
       // pointer may already have been released
     }
+    const target = dropTargetRef.current
+    dropTargetRef.current = null
+    onDropTargetChange?.(null)
+    setDragTarget(false)
     setDragging(false)
+    const pos = commit && lastPosRef.current ? lastPosRef.current : null
+    if (
+      pos &&
+      target &&
+      lastClientRef.current &&
+      target.type === 'group' &&
+      onDropBlockOnGroup
+    ) {
+      onDropBlockOnGroup(target.groupId, block.id, lastClientRef.current)
+      applyPosition({ x: placement.positionX, y: placement.positionY })
+      lastClientRef.current = null
+      return
+    }
+    lastClientRef.current = null
     if (commit && lastPosRef.current) {
       onDragEnd(lastPosRef.current)
     }
@@ -166,7 +224,7 @@ export function BlockShell({
 
   const isGroup = block.kind === 'file-group'
   const isText = block.kind === 'text'
-  const canReceiveDrop = isGroup && !!onDropFilesOnGroup
+  const canReceiveDrop = isGroup && (!!onDropFilesOnGroup || !!onDropBlockOnGroup)
 
   const stopTarget = () => {
     dragDepthRef.current = 0
@@ -174,39 +232,49 @@ export function BlockShell({
   }
 
   const onGroupDragEnter = (e: ReactDragEvent<HTMLDivElement>) => {
-    if (!hasFiles(e)) return
+    if (!groupAcceptsDrop(e)) return
     e.preventDefault()
     dragDepthRef.current += 1
     setDragTarget(true)
   }
 
   const onGroupDragOver = (e: ReactDragEvent<HTMLDivElement>) => {
-    if (!hasFiles(e)) return
+    if (!groupAcceptsDrop(e)) return
     e.preventDefault()
     e.stopPropagation()
   }
 
   const onGroupDragLeave = (e: ReactDragEvent<HTMLDivElement>) => {
-    if (!hasFiles(e)) return
+    if (!groupAcceptsDrop(e)) return
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
     if (dragDepthRef.current === 0) setDragTarget(false)
   }
 
   const onGroupDrop = (e: ReactDragEvent<HTMLDivElement>) => {
-    if (!hasFiles(e)) return
+    if (!groupAcceptsDrop(e)) return
     e.preventDefault()
     e.stopPropagation()
     stopTarget()
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length === 0 || !onDropFilesOnGroup) return
-    onDropFilesOnGroup(block.id, files, { x: e.clientX, y: e.clientY })
+    const types = Array.from(e.dataTransfer.types)
+    if (types.includes('Files')) {
+      const files = Array.from(e.dataTransfer.files)
+      if (files.length > 0 && onDropFilesOnGroup) {
+        onDropFilesOnGroup(block.id, files, { x: e.clientX, y: e.clientY })
+      }
+    } else if (types.includes(BLOCK_ID_MIME)) {
+      const droppedBlockId = e.dataTransfer.getData(BLOCK_ID_MIME)
+      if (droppedBlockId && onDropBlockOnGroup) {
+        onDropBlockOnGroup(block.id, droppedBlockId, { x: e.clientX, y: e.clientY })
+      }
+    }
   }
 
   return (
     <div
       ref={elRef}
-      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget ? ' is-drop-target' : ''}`}
+      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}`}
       style={{ left: placement.positionX, top: placement.positionY }}
+      data-block-id={block.id}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(e) => finishDrag(e, true)}
@@ -233,10 +301,11 @@ export function BlockShell({
               onGroupViewChange ? (view) => onGroupViewChange(block.id, view) : undefined
             }
             onMemberClick={onMemberClick}
+            fromGroupId={isGroup ? block.id : undefined}
           />
           {!isText && !isGroup && (
             <p className="block-muted">
-              {block.kind} · {block.id.slice(0, 8)} · v{block.schemaVersion}
+              {Math.round(placement.positionX)}, {Math.round(placement.positionY)}
             </p>
           )}
         </>
