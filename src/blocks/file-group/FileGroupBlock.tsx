@@ -3,11 +3,15 @@ import { formatBytes } from '#/blocks/file/FileCard'
 import type { ObservableBlock } from '#/components/canvas/BlockShell'
 import type { FileBlockData, FileGroupBlockData } from '#/types'
 
+const BLOCK_ID_MIME = 'application/x-khoja-block-id'
+const FROM_GROUP_MIME = 'application/x-khoja-from-group'
+
 interface FileGroupBlockProps {
   data: FileGroupBlockData
   members: ObservableBlock[]
   onViewChange?: (view: 'card' | 'list') => void
   onMemberClick?: (blockId: string) => void
+  fromGroupId?: string
 }
 
 /** File Group block: a container that renders its `file` members as a card or
@@ -18,6 +22,7 @@ export function FileGroupBlock({
   members,
   onViewChange,
   onMemberClick,
+  fromGroupId,
 }: FileGroupBlockProps) {
   const view = data.currentView
 
@@ -65,6 +70,7 @@ export function FileGroupBlock({
                 key={member.id}
                 member={member}
                 onMemberClick={onMemberClick}
+                fromGroupId={fromGroupId}
               />
             ))}
           </ul>
@@ -75,6 +81,7 @@ export function FileGroupBlock({
                 key={member.id}
                 member={member}
                 onMemberClick={onMemberClick}
+                fromGroupId={fromGroupId}
                 list
               />
             ))}
@@ -92,10 +99,16 @@ export function FileGroupBlock({
 interface FileGroupMemberProps {
   member: ObservableBlock
   onMemberClick?: (blockId: string) => void
+  fromGroupId?: string
   list?: boolean
 }
 
-function FileGroupMember({ member, onMemberClick, list = false }: FileGroupMemberProps) {
+function FileGroupMember({
+  member,
+  onMemberClick,
+  fromGroupId,
+  list = false,
+}: FileGroupMemberProps) {
   const data = member.data as FileBlockData
   return (
     <li>
@@ -105,6 +118,12 @@ function FileGroupMember({ member, onMemberClick, list = false }: FileGroupMembe
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => onMemberClick?.(member.id)}
         title={data.name}
+        draggable="true"
+        onDragStart={(e) => {
+          e.dataTransfer.setData(BLOCK_ID_MIME, member.id)
+          if (fromGroupId) e.dataTransfer.setData(FROM_GROUP_MIME, fromGroupId)
+          e.dataTransfer.effectAllowed = 'copy'
+        }}
       >
         <span className="file-group-member-icon">{FILE_ICON}</span>
         <span className="file-group-member-name">{data.name}</span>

@@ -229,6 +229,7 @@ function PositionField({ blockId, placement, onCommit }: PositionFieldProps) {
         <input
           type="number"
           step="any"
+          aria-label="X position"
           value={x}
           onInput={(e) => setX((e.target as HTMLInputElement).value)}
           onChange={() => undefined}
@@ -245,6 +246,7 @@ function PositionField({ blockId, placement, onCommit }: PositionFieldProps) {
         <input
           type="number"
           step="any"
+          aria-label="Y position"
           value={y}
           onInput={(e) => setY((e.target as HTMLInputElement).value)}
           onChange={() => undefined}

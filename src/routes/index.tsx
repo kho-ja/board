@@ -8,6 +8,7 @@ import type {
   ObservableMembership,
   ObservablePlacement,
 } from '#/components/canvas/BlockShell'
+import type { DropTarget } from '#/components/canvas/BlockShell'
 import { Canvas } from '#/components/canvas/Canvas'
 import { ViewportProvider, useViewport } from '#/components/canvas/ViewportProvider'
 import { ToolRail } from '#/components/canvas/ToolRail'
@@ -132,6 +133,7 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
   const [tool, setTool] = useState<Tool>('move')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [spaceHeld, setSpaceHeld] = useState(false)
+  const [activeDrop, setActiveDrop] = useState<DropTarget | null>(null)
   const forcePan = tool === 'hand' || spaceHeld
   const { runRecorded, undo, redo } = useUndoRedo()
 
@@ -197,6 +199,42 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
       return next
     })
   }, [])
+
+  // Reveal the selected element on the canvas: if a single placed block is
+  // selected and it sits outside the visible area (so it would otherwise be
+  // culled and give no reaction), pan the board to bring it into view.
+  useEffect(() => {
+    if (selectedIds.size !== 1 || !visibleRect || width <= 0 || height <= 0) return
+    const id = Array.from(selectedIds)[0]
+    const placement = placements.find((p) => p.blockId === id)
+    const block = byId.get(id)
+    if (!placement || !block) return
+    const size = sizeForBlock(block.kind)
+    const rect = rectFromWorldPoint(
+      { x: placement.positionX, y: placement.positionY },
+      size.width,
+      size.height,
+    )
+    if (rectsOverlap(visibleRect, rect)) return
+    const cx = rect.minX + size.width / 2
+    const cy = rect.minY + size.height / 2
+    setViewport({
+      scale: viewport.scale,
+      offset: {
+        x: width / 2 - cx * viewport.scale,
+        y: height / 2 - cy * viewport.scale,
+      },
+    })
+  }, [
+    selectedIds,
+    placements,
+    byId,
+    visibleRect,
+    viewport.scale,
+    width,
+    height,
+    setViewport,
+  ])
 
   const viewCenter = useCallback((): Vec => {
     if (width <= 0 || height <= 0) {
@@ -322,24 +360,34 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
     [collections, runRecorded],
   )
 
-  const placeBlockAt = (blockId: string, world: Vec) => {
-    const existing = placements.find((p) => p.blockId === blockId)
-    if (existing) return
-    const size = sizeForBlock(byId.get(blockId)?.kind ?? '')
-    const placement = {
-      blockId,
-      positionX: Math.round(world.x - size.width / 2),
-      positionY: Math.round(world.y - size.height / 2),
-    }
-    runRecorded(
-      'Place block',
-      () => void collections.placementsCollection.insert(placement),
-      () => void collections.placementsCollection.delete(blockId),
-      () => void collections.placementsCollection.insert(placement),
-    )
-    setSelectedIds(new Set([blockId]))
-    setTool('move')
-  }
+  const placeBlockAt = useCallback(
+    (blockId: string, world: Vec) => {
+      const existing = placements.find((p) => p.blockId === blockId)
+      if (existing) return
+      const size = sizeForBlock(byId.get(blockId)?.kind ?? '')
+      const placement = {
+        blockId,
+        positionX: Math.round(world.x - size.width / 2),
+        positionY: Math.round(world.y - size.height / 2),
+      }
+      runRecorded(
+        'Place block',
+        () => void collections.placementsCollection.insert(placement),
+        () => void collections.placementsCollection.delete(blockId),
+        () => void collections.placementsCollection.insert(placement),
+      )
+      setSelectedIds(new Set([blockId]))
+      setTool('move')
+    },
+    [byId, collections, placements, runRecorded],
+  )
+
+  const handlePlaceAsset = useCallback(
+    (blockId: string) => {
+      placeBlockAt(blockId, viewCenter())
+    },
+    [placeBlockAt, viewCenter],
+  )
 
   // Cascade-import dropped/picked files as `file` blocks (metadata only), each
   // auto-placed on a GRID_SPACING grid anchored at `anchor`. Anchor for drops
@@ -486,6 +534,151 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
       void importFiles(files, anchor, groupId)
     },
     [containerRef, importFiles, viewport],
+  )
+
+  const findGroupAt = useCallback(
+    (world: Vec, excludeBlockId: string): ObservableBlock | null => {
+      for (const { block, placement } of placedBlocks) {
+        if (block.id === excludeBlockId) continue
+        if (block.kind !== 'file-group') continue
+        const { width: w, height: h } = sizeForBlock(block.kind)
+        if (
+          world.x >= placement.positionX &&
+          world.x <= placement.positionX + w &&
+          world.y >= placement.positionY &&
+          world.y <= placement.positionY + h
+        ) {
+          return block
+        }
+      }
+      return null
+    },
+    [placedBlocks],
+  )
+
+  const computeDropTarget = useCallback(
+    (world: Vec, _client: Vec, blockId: string): DropTarget | null => {
+      const block = byId.get(blockId)
+      if (!block || block.kind !== 'file') return null
+      const group = findGroupAt(world, blockId)
+      return group ? { type: 'group', groupId: group.id } : null
+    },
+    [byId, findGroupAt],
+  )
+
+  const onDropTargetChange = useCallback((target: DropTarget | null) => {
+    setActiveDrop(target)
+  }, [])
+
+  const handleDropBlockOnGroup = useCallback(
+    (groupId: string, blockId: string, client: Vec) => {
+      const block = byId.get(blockId)
+      if (!block || block.kind !== 'file') return
+      const group = byId.get(groupId)
+      if (!group || group.kind !== 'file-group') return
+
+      const existingPlacement = placements.find((p) => p.blockId === blockId)
+      const existingMembership = memberships.find(
+        (m) => m.groupId === groupId && m.memberId === blockId,
+      )
+      const membership: ObservableMembership = {
+        id: crypto.randomUUID(),
+        groupId,
+        memberId: blockId,
+      }
+
+      const rect = containerRef.current?.getBoundingClientRect()
+      const world =
+        rect && rect.width > 0 && rect.height > 0
+          ? screenToWorld(viewport, { x: client.x - rect.left, y: client.y - rect.top })
+          : viewCenter()
+
+      runRecorded(
+        'Add to group',
+        () => {
+          if (!existingMembership) {
+            collections.membershipsCollection.insert(membership)
+          }
+          if (!existingPlacement) {
+            const size = sizeForBlock(block.kind)
+            collections.placementsCollection.insert({
+              blockId,
+              positionX: Math.round(world.x - size.width / 2),
+              positionY: Math.round(world.y - size.height / 2),
+            })
+          }
+        },
+        () => {
+          if (!existingMembership) {
+            collections.membershipsCollection.delete(membership.id)
+          }
+          if (!existingPlacement) {
+            collections.placementsCollection.delete(blockId)
+          }
+        },
+        () => {
+          if (!existingMembership) {
+            collections.membershipsCollection.insert(membership)
+          }
+          if (!existingPlacement) {
+            const size = sizeForBlock(block.kind)
+            collections.placementsCollection.insert({
+              blockId,
+              positionX: Math.round(world.x - size.width / 2),
+              positionY: Math.round(world.y - size.height / 2),
+            })
+          }
+        },
+      )
+    },
+    [byId, collections, containerRef, memberships, placements, runRecorded, viewCenter, viewport],
+  )
+
+  const handleRemoveFromGroup = useCallback(
+    (groupId: string, memberId: string, world: Vec) => {
+      const membership = memberships.find(
+        (m) => m.groupId === groupId && m.memberId === memberId,
+      )
+      if (!membership) return
+      const block = byId.get(memberId)
+      const existing = placements.find((p) => p.blockId === memberId)
+      const size = block ? sizeForBlock(block.kind) : { width: 220, height: 80 }
+      const newPlacement: ObservablePlacement = {
+        blockId: memberId,
+        positionX: Math.round(world.x - size.width / 2),
+        positionY: Math.round(world.y - size.height / 2),
+      }
+
+      runRecorded(
+        'Extract from group',
+        () => {
+          collections.membershipsCollection.delete(membership.id)
+          if (existing) {
+            updatePlacement(collections, memberId, newPlacement.positionX, newPlacement.positionY)
+          } else {
+            collections.placementsCollection.insert(newPlacement)
+          }
+        },
+        () => {
+          collections.membershipsCollection.insert(membership)
+          if (existing) {
+            updatePlacement(collections, memberId, existing.positionX, existing.positionY)
+          } else {
+            collections.placementsCollection.delete(memberId)
+          }
+        },
+        () => {
+          collections.membershipsCollection.delete(membership.id)
+          if (existing) {
+            updatePlacement(collections, memberId, newPlacement.positionX, newPlacement.positionY)
+          } else {
+            collections.placementsCollection.insert(newPlacement)
+          }
+        },
+      )
+      setSelectedIds(new Set([memberId]))
+    },
+    [byId, collections, memberships, placements, runRecorded],
   )
 
   const handleGroupViewChange = useCallback(
@@ -639,6 +832,15 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
         setTool('move')
         setSelectedIds(new Set())
       }
+
+      if (key === 'backspace' || key === 'delete') {
+        if (selectedIds.size > 0) {
+          event.preventDefault()
+          for (const id of selectedIds) {
+            handleUnplace(id)
+          }
+        }
+      }
     }
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.code === 'Space') setSpaceHeld(false)
@@ -650,7 +852,7 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [undo, redo])
+  }, [undo, redo, selectedIds, handleUnplace])
 
   const onPress = useCallback(
     (world: Vec) => {
@@ -711,6 +913,7 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
           unplaced={unplaced}
           selectedIds={selectedIds}
           onSelect={selectOnly}
+          onPlaceAsset={handlePlaceAsset}
         />
         <div className="canvas-area">
           <Canvas
@@ -722,6 +925,7 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
             onMarquee={onMarquee}
             onImportFiles={onImportFiles}
             onPlaceBlockAt={placeBlockAt}
+            onRemoveFromGroup={handleRemoveFromGroup}
           >
             {placedBlocks.map(({ placement, block }) => (
               <BlockShell
@@ -737,6 +941,12 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
                 onGroupViewChange={handleGroupViewChange}
                 onMemberClick={selectOnly}
                 onDropFilesOnGroup={handleDropFilesOnGroup}
+                computeDropTarget={computeDropTarget}
+                onDropTargetChange={onDropTargetChange}
+                onDropBlockOnGroup={handleDropBlockOnGroup}
+                isGroupDropTarget={
+                  activeDrop?.type === 'group' && activeDrop.groupId === block.id
+                }
               />
             ))}
           </Canvas>

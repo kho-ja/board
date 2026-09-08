@@ -27,6 +27,7 @@ interface BlockRendererProps {
   members?: ObservableBlock[]
   onGroupViewChange?: (view: 'card' | 'list') => void
   onMemberClick?: (blockId: string) => void
+  fromGroupId?: string
 }
 
 export function BlockRenderer({
@@ -34,6 +35,7 @@ export function BlockRenderer({
   members = [],
   onGroupViewChange,
   onMemberClick,
+  fromGroupId,
 }: BlockRendererProps) {
   if (block.kind === 'text') {
     return <TextBlockView data={block.data as TextBlockData} />
@@ -48,6 +50,7 @@ export function BlockRenderer({
         members={members}
         onViewChange={onGroupViewChange}
         onMemberClick={onMemberClick}
+        fromGroupId={fromGroupId}
       />
     )
   }
