@@ -986,6 +986,89 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
     [collections, memberships, placements, runRecorded],
   )
 
+  const handleDeleteBlocks = useCallback(
+    (blockIds: Iterable<string>) => {
+      const ids = Array.from(blockIds)
+      const toDeleteBlocks: ObservableBlock[] = []
+      const toDeletePlacements: ObservablePlacement[] = []
+      const toDeleteMemberships: ObservableMembership[] = []
+
+      for (const id of ids) {
+        const block = byId.get(id)
+        if (block) toDeleteBlocks.push(block)
+
+        const placement = placements.find((p) => p.blockId === id)
+        if (placement) toDeletePlacements.push(placement)
+
+        for (const m of memberships) {
+          if (m.memberId === id || m.groupId === id) {
+            if (!toDeleteMemberships.some((existing) => existing.id === m.id)) {
+              toDeleteMemberships.push(m)
+            }
+          }
+        }
+      }
+
+      if (toDeleteBlocks.length === 0) return
+
+      const label =
+        toDeleteBlocks.length === 1
+          ? `Delete ${toDeleteBlocks[0].kind}`
+          : `Delete ${toDeleteBlocks.length} assets`
+
+      runRecorded(
+        label,
+        () => {
+          for (const m of toDeleteMemberships) {
+            collections.membershipsCollection.delete(m.id)
+          }
+          for (const p of toDeletePlacements) {
+            collections.placementsCollection.delete(p.blockId)
+          }
+          for (const b of toDeleteBlocks) {
+            collections.blocksCollection.delete(b.id)
+          }
+        },
+        () => {
+          for (const b of toDeleteBlocks) {
+            collections.blocksCollection.insert(b)
+          }
+          for (const p of toDeletePlacements) {
+            collections.placementsCollection.insert(p)
+          }
+          for (const m of toDeleteMemberships) {
+            collections.membershipsCollection.insert(m)
+          }
+        },
+        () => {
+          for (const m of toDeleteMemberships) {
+            collections.membershipsCollection.delete(m.id)
+          }
+          for (const p of toDeletePlacements) {
+            collections.placementsCollection.delete(p.blockId)
+          }
+          for (const b of toDeleteBlocks) {
+            collections.blocksCollection.delete(b.id)
+          }
+        },
+      )
+
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const b of toDeleteBlocks) next.delete(b.id)
+        return next
+      })
+    },
+    [byId, collections, memberships, placements, runRecorded],
+  )
+
+  const handleDeleteBlock = useCallback(
+    (blockId: string) => {
+      handleDeleteBlocks([blockId])
+    },
+    [handleDeleteBlocks],
+  )
+
   const zoomAtCenter = (factor: number) => {
     if (width <= 0 || height <= 0) return
     setViewport(zoomAt(viewport, { x: width / 2, y: height / 2 }, factor))
@@ -1139,6 +1222,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
           selectedIds={selectedIds}
           onSelect={selectOnly}
           onPlaceAsset={handlePlaceAsset}
+          onDeleteAsset={handleDeleteBlock}
           onOpenSchemaCreator={handleOpenSchemaCreator}
           onCreateInstance={handleCreateInstance}
           onDeleteType={handleDeleteType}
@@ -1190,6 +1274,8 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
           onUpdatePosition={handleUpdatePosition}
           onUnplace={handleUnplace}
           onDeleteGroup={handleDeleteGroup}
+          onDeleteBlock={handleDeleteBlock}
+          onDeleteBlocks={handleDeleteBlocks}
           onRenameGroup={handleRenameGroup}
           onUpdateObjectValues={handleUpdateObjectValues}
           onEditSchema={handleOpenSchemaCreator}

@@ -1,15 +1,30 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   ReactNode,
 } from 'react'
 
-import type { SchemaDef } from '#/types'
+import type { FileBlockData, SchemaDef } from '#/types'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
 type Tab = 'layers' | 'assets' | 'types'
+
+export type AssetSort =
+  | 'name-asc'
+  | 'name-desc'
+  | 'type'
+  | 'newest'
+  | 'oldest'
+  | 'size'
+
+function formatSize(bytes?: number): string | null {
+  if (bytes === undefined || bytes === null || Number.isNaN(bytes)) return null
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 interface LeftDockProps {
   placed: { block: ObservableBlock; placement: ObservablePlacement }[]
@@ -18,6 +33,7 @@ interface LeftDockProps {
   selectedIds: ReadonlySet<string>
   onSelect: (blockId: string) => void
   onPlaceAsset?: (blockId: string) => void
+  onDeleteAsset?: (blockId: string) => void
   onOpenSchemaCreator?: (schema?: SchemaDef) => void
   onCreateInstance?: (schemaId: string) => void
   onDeleteType?: (schemaId: string) => void
@@ -30,6 +46,7 @@ export function LeftDock({
   selectedIds,
   onSelect,
   onPlaceAsset,
+  onDeleteAsset,
   onOpenSchemaCreator,
   onCreateInstance,
   onDeleteType,
@@ -37,6 +54,48 @@ export function LeftDock({
   const [tab, setTab] = useState<Tab>('layers')
   const [layersActive, setLayersActive] = useState(0)
   const [assetsActive, setAssetsActive] = useState(0)
+  const [assetSort, setAssetSort] = useState<AssetSort>('name-asc')
+
+  const sortedUnplaced = useMemo(() => {
+    const list = [...unplaced]
+    return list.sort((a, b) => {
+      const titleA = blockTitle(a, types).toLowerCase()
+      const titleB = blockTitle(b, types).toLowerCase()
+
+      switch (assetSort) {
+        case 'name-asc':
+          return titleA.localeCompare(titleB)
+        case 'name-desc':
+          return titleB.localeCompare(titleA)
+        case 'type': {
+          const typeA = a.kind.toLowerCase()
+          const typeB = b.kind.toLowerCase()
+          return typeA === typeB
+            ? titleA.localeCompare(titleB)
+            : typeA.localeCompare(typeB)
+        }
+        case 'newest': {
+          const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          return tB - tA
+        }
+        case 'oldest': {
+          const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          return tA - tB
+        }
+        case 'size': {
+          const sizeA =
+            a.kind === 'file' ? ((a.data as FileBlockData).size ?? 0) : 0
+          const sizeB =
+            b.kind === 'file' ? ((b.data as FileBlockData).size ?? 0) : 0
+          return sizeB - sizeA
+        }
+        default:
+          return 0
+      }
+    })
+  }, [unplaced, types, assetSort])
 
   useEffect(() => {
     if (unplaced.length > 0) setTab('assets')
@@ -47,11 +106,12 @@ export function LeftDock({
       placed.length === 0 ? 0 : Math.min(i, placed.length - 1),
     )
   }, [placed.length])
+
   useEffect(() => {
     setAssetsActive((i) =>
-      unplaced.length === 0 ? 0 : Math.min(i, unplaced.length - 1),
+      sortedUnplaced.length === 0 ? 0 : Math.min(i, sortedUnplaced.length - 1),
     )
-  }, [unplaced.length])
+  }, [sortedUnplaced.length])
 
   const tabsRef = useRef<HTMLDivElement>(null)
 
@@ -174,9 +234,29 @@ export function LeftDock({
           aria-labelledby="dock-tab-assets"
           hidden={tab !== 'assets'}
         >
+          {unplaced.length > 0 && (
+            <div className="dock-assets-toolbar">
+              <label className="dock-sort-label" htmlFor="dock-asset-sort">
+                Sort
+              </label>
+              <select
+                id="dock-asset-sort"
+                className="dock-sort-select"
+                value={assetSort}
+                onChange={(e) => setAssetSort(e.target.value as AssetSort)}
+              >
+                <option value="name-asc">Name (A &rarr; Z)</option>
+                <option value="name-desc">Name (Z &rarr; A)</option>
+                <option value="type">Type</option>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="size">Size (Large &rarr; Small)</option>
+              </select>
+            </div>
+          )}
           <NavList
             idPrefix="asset"
-            items={unplaced}
+            items={sortedUnplaced}
             getKey={(b: ObservableBlock) => b.id}
             activeIndex={assetsActive}
             onActiveIndexChange={setAssetsActive}
@@ -184,23 +264,66 @@ export function LeftDock({
             selectedKeys={new Set()}
             label="Unplaced assets"
             empty="Nothing waiting. New text lands on the canvas."
-            renderContent={(block: ObservableBlock, active) => (
-              <div
-                className="asset-row"
-                data-active={active || undefined}
-                draggable="true"
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(
-                    'application/x-khoja-block-id',
-                    block.id,
-                  )
-                  e.dataTransfer.effectAllowed = 'copy'
-                }}
-              >
-                <span className="layer-chip" aria-hidden="true" />
-                <span className="layer-name">{blockTitle(block, types)}</span>
-              </div>
-            )}
+            renderContent={(block: ObservableBlock, active) => {
+              const title = blockTitle(block, types)
+              const isFile = block.kind === 'file'
+              const sizeStr = isFile
+                ? formatSize((block.data as FileBlockData).size)
+                : null
+
+              return (
+                <div
+                  className="asset-row"
+                  data-active={active || undefined}
+                  draggable="true"
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      'application/x-khoja-block-id',
+                      block.id,
+                    )
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                >
+                  <div className="asset-row-main">
+                    <span className="layer-chip" aria-hidden="true" />
+                    <span className="layer-name" title={title}>
+                      {title}
+                    </span>
+                  </div>
+                  {sizeStr && <span className="asset-size">{sizeStr}</span>}
+                  <div className="asset-actions">
+                    {onPlaceAsset && (
+                      <button
+                        type="button"
+                        className="asset-action-btn asset-place-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onPlaceAsset(block.id)
+                        }}
+                        title="Place on board"
+                        aria-label={`Place ${title} on board`}
+                      >
+                        + Add
+                      </button>
+                    )}
+                    {onDeleteAsset && (
+                      <button
+                        type="button"
+                        className="asset-action-btn asset-delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDeleteAsset(block.id)
+                        }}
+                        title="Delete asset permanently"
+                        aria-label={`Delete ${title} permanently`}
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            }}
           />
         </div>
         <div
@@ -358,7 +481,9 @@ function NavList<T>({
   }
 
   const onOptionClick = (e: ReactMouseEvent, index: number) => {
-    // Keep focus on the listbox container so arrow navigation keeps working.
+    // Keep focus on the listbox container so arrow navigation keeps working,
+    // but don't activate selection if clicking an inner interactive control.
+    if ((e.target as HTMLElement).closest('button')) return
     e.preventDefault()
     listRef.current?.focus()
     activate(index)

@@ -1850,3 +1850,115 @@ a {
   outline: 2px solid var(--lagoon);
   outline-offset: 2px;
 }
+
+
+/* ---------- Asset Management & Sorting ---------- */
+
+.dock-assets-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.35rem;
+}
+
+.dock-sort-label {
+  color: var(--sea-ink-soft);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: none;
+}
+
+.dock-sort-select {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-float);
+  color: var(--sea-ink);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.35rem;
+  cursor: pointer;
+}
+
+.dock-sort-select:focus {
+  outline: none;
+  border-color: var(--lagoon);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 35%, transparent);
+}
+
+.asset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.asset-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.asset-size {
+  flex: none;
+  font-size: 0.64rem;
+  color: var(--sea-ink-soft);
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.15rem;
+}
+
+.asset-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0.4;
+  transition: opacity 120ms ease;
+  flex: none;
+}
+
+.asset-row:hover .asset-actions,
+.asset-row[data-active='true'] .asset-actions {
+  opacity: 1;
+}
+
+.asset-action-btn {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--sea-ink);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.asset-action-btn:hover {
+  border-color: var(--lagoon);
+  background: color-mix(in oklab, var(--lagoon) 15%, var(--surface));
+  color: var(--lagoon-deep);
+}
+
+.asset-action-btn.asset-delete-btn {
+  font-size: 0.85rem;
+  padding: 0.1rem 0.35rem;
+  color: var(--sea-ink-soft);
+}
+
+.asset-action-btn.asset-delete-btn:hover {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}

@@ -16,6 +16,8 @@ interface InspectorProps {
   onUpdatePosition: (blockId: string, x: number, y: number) => void
   onUnplace?: (blockId: string) => void
   onDeleteGroup?: (groupId: string) => void
+  onDeleteBlock?: (blockId: string) => void
+  onDeleteBlocks?: (blockIds: Iterable<string>) => void
   onRenameGroup?: (blockId: string, name: string) => void
   onUpdateObjectValues?: (
     blockId: string,
@@ -35,6 +37,8 @@ export function Inspector({
   onUpdatePosition,
   onUnplace,
   onDeleteGroup,
+  onDeleteBlock,
+  onDeleteBlocks,
   onRenameGroup,
   onUpdateObjectValues,
   onEditSchema,
@@ -82,6 +86,12 @@ export function Inspector({
             >
               Remove {selected.length} from board
             </button>
+          )}
+          {onDeleteBlocks && (
+            <ConfirmDeleteMultiButton
+              count={selected.length}
+              onDelete={() => onDeleteBlocks(selected.map((s) => s.block.id))}
+            />
           )}
         </div>
       </aside>
@@ -162,6 +172,13 @@ export function Inspector({
         )}
         {isGroup && onDeleteGroup && (
           <ConfirmDeleteGroupButton groupId={block.id} onDeleteGroup={onDeleteGroup} />
+        )}
+        {!isGroup && onDeleteBlock && (
+          <ConfirmDeleteBlockButton
+            blockId={block.id}
+            kind={isObject ? objectSchema?.name ?? block.kind : block.kind}
+            onDeleteBlock={onDeleteBlock}
+          />
         )}
       </div>
     </aside>
@@ -250,6 +267,80 @@ function ConfirmDeleteGroupButton({
       title="Delete this group. Files inside will be moved to the canvas."
     >
       {armed ? 'Click again to confirm delete' : 'Delete group'}
+    </button>
+  )
+}
+
+function ConfirmDeleteBlockButton({
+  blockId,
+  kind,
+  onDeleteBlock,
+}: {
+  blockId: string
+  kind: string
+  onDeleteBlock: (blockId: string) => void
+}) {
+  const [armed, setArmed] = useState(false)
+
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
+
+  const onClick = () => {
+    if (!armed) {
+      setArmed(true)
+    } else {
+      onDeleteBlock(blockId)
+      setArmed(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`inspector-btn danger${armed ? ' is-armed' : ''}`}
+      onClick={onClick}
+      title="Permanently delete this asset and its data."
+    >
+      {armed ? 'Click again to confirm delete' : `Delete ${kind}`}
+    </button>
+  )
+}
+
+function ConfirmDeleteMultiButton({
+  count,
+  onDelete,
+}: {
+  count: number
+  onDelete: () => void
+}) {
+  const [armed, setArmed] = useState(false)
+
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
+
+  const onClick = () => {
+    if (!armed) {
+      setArmed(true)
+    } else {
+      onDelete()
+      setArmed(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`inspector-btn danger${armed ? ' is-armed' : ''}`}
+      onClick={onClick}
+      title="Permanently delete selected assets."
+    >
+      {armed ? 'Click again to confirm delete' : `Delete ${count} assets`}
     </button>
   )
 }
