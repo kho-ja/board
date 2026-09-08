@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-09-08 — Asset categorization, sort modes, keyboard navigation, and Place Files affordance
+
+- **Asset Category System** (`src/lib/assets/categories.ts`): Added smart classification
+  partitioning unplaced blocks and files into 6 standard categories (`Images`, `Documents`,
+  `Code & Data`, `Media`, `Notes & Text`, and Custom Schema Types).
+- **Dock Group Dividers & Sorting**: LeftDock Assets tab now defaults to Category sorting,
+  displaying sticky visual group headers with per-category count badges. Added 6 sort modes
+  (Category, Name A-Z, Name Z-A, Newest, Oldest, Size) with hotkey `S` to cycle modes.
+- **Dedicated Asset Hotkeys & Smooth Navigation**:
+  - `A` toggles/focuses the Assets tab in LeftDock.
+  - `↑` / `↓` navigate assets without prematurely placing them.
+  - `Enter` / `Space` or `+ Place` places highlighted asset at view center.
+  - `Del` / `Backspace` or `×` button permanently deletes asset with undo support.
+  - Drag & drop from dock onto canvas places asset at cursor coordinate.
+- **Permanent Deletion & Cascade**: Two-step permanent deletion in Inspector (single and
+  multi-selection) and Assets dock, cascading to `blocks`, `placements`, and `memberships`
+  with atomic `runRecorded` undo/redo.
+- **Explicit "Place files" Affordance**: Renamed TopBar button from "Paste files" to
+  "Place files" and added a direct "+ Place files" file picker in the Assets dock toolbar.
+
+## 2026-09-08 — M7: Custom Object Types & Schema-Driven Blocks
+
+- **Custom Schema Definition** (`types` table + collection): Added schema creator modal
+  allowing users to define custom types with fields (`text`, `number`, `boolean`, `date`).
+- **Object Block Instances**: Added `object` block kind rendering custom type cards with
+  field values, editable values in Inspector, and a Types tab in LeftDock.
+
 ## 2026-09-03 — Ctrl+Z undo / Ctrl+Shift+Z redo for board mutations
 
 - Added an **action-based undo stack** (`src/hooks/useUndoRedo.ts`):

@@ -38,39 +38,57 @@ things are done before they are done.
   Layers/Assets dock, right Inspector (editable X/Y), bottom status bar, block
   selection + highlights, and a zoom-aware dot grid that re-snaps per zoom. See
   CHANGELOG 2026-09-02.
-- **M4 — File blocks + paste:** "Paste files" button + hidden multi-file input in
+- **M4 — File blocks + paste:** "Place files" button + hidden multi-file input in
   the top bar, plus a canvas drop zone; dropped/picked files become `file` blocks
   (metadata only) rendered as file cards, auto-placed in a cascade grid, with the
   first selected. Text blocks render plain-text Figma-style. Also fixed a
   placement FK race by awaiting `tx.isPersisted.promise` on the block insert
   before inserting the placement. See CHANGELOG 2026-09-02.
-
-## In progress
-
-- Nothing currently blocked — next work item below.
-
-## Completed
-
-- **M6 File Groups** — generic schema system + reference grouping: `file-group` block on
+- **M6 — File Groups:** generic schema system + reference grouping: `file-group` block on
   canvas with create, drop-file-to-add (membership CRUD), card/list view toggle
   (persisted), rename, remove from board (memberships preserved for re-place),
   delete (memberships dropped, member placements survive). Tested: persistence,
   re-place restores members, member click selects underlying placed file, two-step
   delete confirm.
+- **M7 — Custom Object Types & Schema Editor:** schema definition modal (`types` table),
+  dynamic field types (`text`, `number`, `boolean`, `date`), block instances (`object` kind),
+  type-specific card rendering, in-place field value editing in Inspector, dynamic Types tab
+  in LeftDock with instance creation.
+- **M8 — Integration Polish & Canvas UX:** action-based undo/redo (`Ctrl+Z` / `Ctrl+Shift+Z`),
+  marquee selection, batched unplace and permanent delete with cascade cleanup, clipboard paste
+  support for OS files and markdown text directly centered on viewport, keyboard hotkeys
+  (`V`, `H`, `T`, `A`, `Space`, `Del`, `Esc`).
+- **Asset Management & Category Sorting:** automatic file categorization (`Images`,
+  `Documents`, `Code & Data`, `Media`, `Notes & Text`, Custom Types), category section
+  dividers and badges in Assets dock, 6 sort modes with Category default, keyboard shortcuts
+  (`A` toggle dock, `S` cycle sort, `↑`/`↓` navigate, `Enter` place, `Del` delete), and
+  explicit "Place files" affordances in both top bar and Assets dock.
+
+## In progress
+
+- **M9 — v1 Relationships ("Link with a Line"):** connecting blocks with visual lines.
 
 ## Next (in rough order)
 
-0. **v1 relationships** — simple "link with a line" between blocks.
-1. Save/load of the canvas layout (see OQ-13 schema versioning).
-4. The side-panel / asset library, and how group membership is stored (OQ-10).
+0. **M9 — v1 Relationships ("Link with a Line"):**
+   - Link data model (`links` table in Postgres + `links` collection in TanStack DB).
+   - SVG interactive connector overlay layer with smooth Bezier / orthogonal routing.
+   - Connector Tool (`C` / `L` hotkey) and block connection anchor handles.
+   - Dynamic real-time re-routing as connected blocks are moved on canvas.
+   - Link selection, hover effects, and deletion with atomic undo/redo.
+1. **M10 — Multi-Block Group Drag & Layout Tools:**
+   - Moving any block in a multi-selection shifts all selected placements together.
+   - Selection alignment tools (Align Left/Right/Top/Bottom, Distribute).
+2. **M11 — Board Serialization & Export / Import:**
+   - Full board JSON export and import (blocks, placements, memberships, types, links).
+   - Canvas snapshot PNG export.
+3. **M12 — Spatial Mini-Map & Quick Navigation:**
+   - Corner overview mini-map showing all placed blocks on the infinite canvas.
+   - Click/drag mini-map viewport box to navigate quickly.
 
 > **Typed connections** (`depends-on`, `responsible-for`, `part-of`, `related-to`)
 > are consciously **deferred out of v1** — they become an optional power feature
 > later. The full design is preserved in DECISIONS.md and DESIGN.md §2.
-
-> Earlier "proving set" note: the Person/Feature/API-first idea was **dropped**.
-> Under the schema-driven model those become example presets, not built-in code;
-> the generic schema system is the actual deliverable.
 
 ## Future ideas (do not pretend these exist yet)
 
