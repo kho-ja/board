@@ -5,25 +5,34 @@ import type {
   ReactNode,
 } from 'react'
 
+import type { SchemaDef } from '#/types'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
-type Tab = 'layers' | 'assets'
+type Tab = 'layers' | 'assets' | 'types'
 
 interface LeftDockProps {
   placed: { block: ObservableBlock; placement: ObservablePlacement }[]
   unplaced: ObservableBlock[]
+  types?: readonly SchemaDef[]
   selectedIds: ReadonlySet<string>
   onSelect: (blockId: string) => void
   onPlaceAsset?: (blockId: string) => void
+  onOpenSchemaCreator?: (schema?: SchemaDef) => void
+  onCreateInstance?: (schemaId: string) => void
+  onDeleteType?: (schemaId: string) => void
 }
 
 export function LeftDock({
   placed,
   unplaced,
+  types = [],
   selectedIds,
   onSelect,
   onPlaceAsset,
+  onOpenSchemaCreator,
+  onCreateInstance,
+  onDeleteType,
 }: LeftDockProps) {
   const [tab, setTab] = useState<Tab>('layers')
   const [layersActive, setLayersActive] = useState(0)
@@ -112,6 +121,19 @@ export function LeftDock({
           Assets
           <span className="dock-count">{unplaced.length}</span>
         </button>
+        <button
+          type="button"
+          className={`dock-tab${tab === 'types' ? ' is-active' : ''}`}
+          onClick={() => setTab('types')}
+          role="tab"
+          id="dock-tab-types"
+          aria-selected={tab === 'types'}
+          aria-controls="dock-panel-types"
+          tabIndex={tab === 'types' ? 0 : -1}
+        >
+          Types
+          <span className="dock-count">{types.length}</span>
+        </button>
       </div>
 
       <div className="dock-body">
@@ -137,7 +159,7 @@ export function LeftDock({
                 data-active={active || undefined}
               >
                 <span className="layer-chip" aria-hidden="true" />
-                <span className="layer-name">{blockTitle(it.block)}</span>
+                <span className="layer-name">{blockTitle(it.block, types)}</span>
                 <span className="layer-pos">
                   {Math.round(it.placement.positionX)},{' '}
                   {Math.round(it.placement.positionY)}
@@ -176,10 +198,91 @@ export function LeftDock({
                 }}
               >
                 <span className="layer-chip" aria-hidden="true" />
-                <span className="layer-name">{blockTitle(block)}</span>
+                <span className="layer-name">{blockTitle(block, types)}</span>
               </div>
             )}
           />
+        </div>
+        <div
+          id="dock-panel-types"
+          role="tabpanel"
+          aria-labelledby="dock-tab-types"
+          hidden={tab !== 'types'}
+        >
+          <div className="dock-types-header">
+            <span className="dock-types-title">Custom Types</span>
+            {onOpenSchemaCreator && (
+              <button
+                type="button"
+                className="dock-new-type-btn"
+                onClick={() => onOpenSchemaCreator()}
+              >
+                + New Type
+              </button>
+            )}
+          </div>
+          {types.length === 0 ? (
+            <div className="dock-empty">
+              <p>No custom types yet.</p>
+              {onOpenSchemaCreator && (
+                <button
+                  type="button"
+                  className="dock-empty-cta"
+                  onClick={() => onOpenSchemaCreator()}
+                >
+                  Create your first type
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="dock-types-list">
+              {types.map((t) => (
+                <div key={t.id} className="dock-type-card">
+                  <div className="dock-type-card-head">
+                    <span className="dock-type-name">{t.name}</span>
+                    <span className="dock-type-fields-badge">
+                      {t.fields.length} {t.fields.length === 1 ? 'field' : 'fields'}
+                    </span>
+                  </div>
+                  <p className="dock-type-fields-preview">
+                    {t.fields.map((f) => f.name).join(', ') || 'No fields'}
+                  </p>
+                  <div className="dock-type-card-actions">
+                    {onCreateInstance && (
+                      <button
+                        type="button"
+                        className="dock-type-action-btn primary"
+                        onClick={() => onCreateInstance(t.id)}
+                        title={`Place a new ${t.name} on the board`}
+                      >
+                        + Add to board
+                      </button>
+                    )}
+                    {onOpenSchemaCreator && (
+                      <button
+                        type="button"
+                        className="dock-type-action-btn"
+                        onClick={() => onOpenSchemaCreator(t)}
+                        title="Edit schema fields"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {onDeleteType && (
+                      <button
+                        type="button"
+                        className="dock-type-action-btn danger"
+                        onClick={() => onDeleteType(t.id)}
+                        title="Delete type"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </aside>
