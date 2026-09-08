@@ -22,7 +22,7 @@ export function TopBar({
         </div>
       </div>
       <div className="topbar-actions">
-        <span className="topbar-hint">V Move · H Hand · T Text · A Assets · Space pan</span>
+        <span className="topbar-hint">V Move · H Hand · T Text · C Connect · A Assets · Space pan</span>
         {onCreateType && (
           <button
             type="button"

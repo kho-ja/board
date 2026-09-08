@@ -73,3 +73,10 @@ export interface ViewDef {
   targetKind: string
   options: ViewOptions
 }
+
+export interface ObservableLink {
+  id: string
+  blockAId: string
+  blockBId: string
+  createdAt?: Date
+}

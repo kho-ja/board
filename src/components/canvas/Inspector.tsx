@@ -5,13 +5,22 @@ import type {
   FieldValue,
   FileGroupBlockData,
   ObjectBlockData,
+  ObservableLink,
   SchemaDef,
 } from '#/types'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
+export interface SelectedLinkInfo {
+  link: ObservableLink
+  blockA?: ObservableBlock
+  blockB?: ObservableBlock
+}
+
 interface InspectorProps {
   selected: { block: ObservableBlock; placement: ObservablePlacement | null }[]
+  selectedLink?: SelectedLinkInfo | null
+  onDeleteLink?: (linkId: string) => void
   types?: readonly SchemaDef[]
   onUpdatePosition: (blockId: string, x: number, y: number) => void
   onUnplace?: (blockId: string) => void
@@ -33,6 +42,8 @@ function round(v: number): string {
 
 export function Inspector({
   selected,
+  selectedLink,
+  onDeleteLink,
   types,
   onUpdatePosition,
   onUnplace,
@@ -45,6 +56,40 @@ export function Inspector({
   membersByGroup,
 }: InspectorProps) {
   if (selected.length === 0) {
+    if (selectedLink) {
+      const titleA = selectedLink.blockA ? blockTitle(selectedLink.blockA) : 'Unknown Block'
+      const titleB = selectedLink.blockB ? blockTitle(selectedLink.blockB) : 'Unknown Block'
+      return (
+        <aside className="inspector">
+          <div className="inspector-head">
+            <span className="inspector-kind">Relationship</span>
+            <h2 className="inspector-title">Connection Line</h2>
+          </div>
+          <dl className="inspector-meta">
+            <div>
+              <dt>Connected from</dt>
+              <dd>{titleA}</dd>
+            </div>
+            <div>
+              <dt>Connected to</dt>
+              <dd>{titleB}</dd>
+            </div>
+          </dl>
+          <div className="inspector-actions">
+            {onDeleteLink && (
+              <button
+                type="button"
+                className="inspector-btn danger"
+                onClick={() => onDeleteLink(selectedLink.link.id)}
+              >
+                Delete connection
+              </button>
+            )}
+          </div>
+        </aside>
+      )
+    }
+
     return (
       <aside className="inspector">
         <p className="inspector-empty">No selection</p>

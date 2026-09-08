@@ -5,6 +5,7 @@ import type {
   BlockRow,
   MembershipInsert,
   MembershipRow,
+  LinkInsert,
   PlacementInsert,
   PlacementRow,
   TypeInsert,
@@ -15,16 +16,19 @@ import type {
 
 import {
   deleteBlock,
+  deleteLink,
   deleteMembership,
   deletePlacement,
   deleteType,
   deleteView,
   insertBlock,
+  insertLink,
   insertMembership,
   insertPlacement,
   insertType,
   insertView,
   listBlocks,
+  listLinks,
   listMemberships,
   listPlacements,
   listTypes,
@@ -154,4 +158,21 @@ export const deleteViewFn = createServerFn({ method: 'POST' })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
     return await deleteView(data.id)
+  })
+// ---------- Links ----------
+
+export const listLinksFn = createServerFn({ method: 'GET' }).handler(async () => {
+  return await listLinks()
+})
+
+export const insertLinkFn = createServerFn({ method: 'POST' })
+  .validator((input: LinkInsert) => input)
+  .handler(async ({ data }) => {
+    return await insertLink(data)
+  })
+
+export const deleteLinkFn = createServerFn({ method: 'POST' })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    return await deleteLink(data.id)
   })

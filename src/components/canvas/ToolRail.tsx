@@ -36,6 +36,20 @@ function ToolIcon({ tool }: { tool: Tool }) {
           T
         </span>
       )
+    case 'link':
+      return (
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <circle cx="3.5" cy="12.5" r="1.8" fill="none" stroke="currentColor" strokeWidth="1.3" />
+          <circle cx="12.5" cy="3.5" r="1.8" fill="none" stroke="currentColor" strokeWidth="1.3" />
+          <path
+            d="M5 11.2 C 6.5 7.5, 8.5 8.5, 11 4.8"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+          />
+        </svg>
+      )
   }
 }
 
@@ -48,11 +62,14 @@ export function ToolRail({ tool, onSelect }: ToolRailProps) {
           type="button"
           className={`tool-button${tool === id ? ' is-active' : ''}`}
           onClick={() => onSelect(id)}
-          title={`${label} (${shortcut})`}
-          aria-label={label}
+          aria-label={`${label} (${shortcut})`}
           aria-pressed={tool === id}
+          title={`${label} (${shortcut})`}
         >
           <ToolIcon tool={id} />
+          <span className="tool-shortcut" aria-hidden="true">
+            {shortcut}
+          </span>
         </button>
       ))}
     </nav>

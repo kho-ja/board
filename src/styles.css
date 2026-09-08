@@ -2036,3 +2036,123 @@ a {
   background: rgba(220, 38, 38, 0.12);
   color: #dc2626;
 }
+
+/* ---------- Milestone 9: v1 Relationships ("Link with a Line") ---------- */
+
+.canvas-viewport.tool-link {
+  cursor: crosshair;
+}
+
+.canvas-viewport.tool-link .block-shell {
+  cursor: pointer;
+}
+
+.canvas-links-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.canvas-link-line {
+  transition: stroke 120ms ease, stroke-width 120ms ease;
+}
+
+.canvas-link-line.is-selected {
+  stroke: var(--lagoon);
+  stroke-width: 2.5px;
+}
+
+.canvas-link-line.is-hovered:not(.is-selected) {
+  stroke: var(--lagoon-deep);
+  stroke-width: 2.2px;
+}
+
+.canvas-link-draft {
+  animation: link-dash 600ms linear infinite;
+}
+
+@keyframes link-dash {
+  to {
+    stroke-dashoffset: -9;
+  }
+}
+
+/* Port anchors on BlockShell */
+.block-port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  border: 2px solid var(--sea-ink-soft);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: crosshair;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+  z-index: 20;
+}
+
+.block-port-top {
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.85);
+}
+
+.block-port-bottom {
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.85);
+}
+
+.block-port-left {
+  top: 50%;
+  left: -6px;
+  transform: translateY(-50%) scale(0.85);
+}
+
+.block-port-right {
+  top: 50%;
+  right: -6px;
+  transform: translateY(-50%) scale(0.85);
+}
+
+.block-shell:hover .block-port,
+.canvas-viewport.tool-link .block-port,
+.block-shell.is-connecting-source .block-port {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.block-port:hover {
+  border-color: var(--lagoon);
+  background: var(--lagoon);
+  box-shadow: 0 0 8px var(--lagoon);
+}
+
+.block-port-top:hover {
+  transform: translateX(-50%) scale(1.25);
+}
+.block-port-bottom:hover {
+  transform: translateX(-50%) scale(1.25);
+}
+.block-port-left:hover {
+  transform: translateY(-50%) scale(1.25);
+}
+.block-port-right:hover {
+  transform: translateY(-50%) scale(1.25);
+}
+
+.block-shell.is-connecting-source {
+  border-color: var(--lagoon) !important;
+  box-shadow: 0 0 0 2px var(--lagoon) !important;
+}
+
+.block-shell.is-connect-target {
+  border-color: var(--lagoon-deep) !important;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 60%, transparent) !important;
+}
