@@ -125,8 +125,44 @@ Postgres.
 ### M8 — Integration polish + uniform UX
 - BlockShell: selection highlight, dbl-click edit per type, Delete to unplace,
   Escape to deselect; full BlockRenderer switch; final layout + toolbar; footer hint.
+- Action-based undo/redo (Ctrl+Z / Ctrl+Shift+Z), marquee box multi-selection,
+  OS file and markdown clipboard paste centering on viewport, cascade unplace & delete.
 - Verify: full walkthrough (paste → group → views → text → custom type → remove/
   re-place → delete group → pan/zoom/drag smooth), everything persists.
+
+### M9 — v1 Relationships ("Link with a Line")  ← current focus
+- Schema & Persistence: `links` table in PostgreSQL (`id`, `block_a_id`, `block_b_id`,
+  `created_at`) + server functions in `queries.server.ts` / `queries.functions.ts` +
+  reactive TanStack DB `links` collection.
+- Lifecycle & Cascade: Link creation and deletion wrapped in `runRecorded` for atomic
+  undo/redo. When a block is permanently deleted, associated links cascade-delete.
+  When a block is unplaced, associated links hide until the block is re-placed.
+- Connection Canvas Layer: SVG path overlay transformed by canvas matrix, computing
+  dynamic curve intersections between block bounding boxes (smooth cubic Bezier or
+  orthogonal rounded lines).
+- Interactive Affordance: Connector Tool (`C` or `L` hotkey) and connection port
+  handles on hovered block edges. Drag from one block port to another block to create
+  a link with real-time preview line.
+- Link Interaction: Click line to select, Inspector shows connection details, `Del`
+  key deletes link with undo.
+- Verify: draw line between blocks → lines re-route dynamically on block drag →
+  undo removes line → redo restores line → delete block cascade-deletes links → reload
+  persists links.
+
+### M10 — Multi-Block Group Movement & Alignment Tools
+- Relative Group Drag: Dragging any block within an active multi-selection translates
+  all selected placements by the same world delta in real-time; commits all positions
+  in a single batched undo/redo action.
+- Alignment & Distribution: Inspector / shortcut actions to align selected blocks
+  (Left, Center, Right, Top, Middle, Bottom) and distribute evenly horizontally/vertically.
+- Verify: marquee-select 3 blocks → drag one → all 3 move together maintaining relative
+  offsets → Ctrl+Z reverts all 3 positions.
+
+### M11 — Board Serialization & Export / Import
+- JSON Export: Download full board state (blocks, placements, memberships, types, links).
+- JSON Import: File drop or picker to load a board JSON file with validation.
+- Canvas PNG Export: Render visible world or selected blocks to a PNG image file.
+- Verify: export board → wipe or modify → import JSON → exact board state restored.
 
 ## 3. Data Model (TypeScript Sketch)
 
