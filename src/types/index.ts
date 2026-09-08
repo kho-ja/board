@@ -55,7 +55,7 @@ export interface SchemaDef {
   id: string
   name: string
   fields: FieldDef[]
-  defaultView?: string
+  defaultView?: string | null
 }
 
 export type ViewLayout = 'card' | 'list' | 'grid'

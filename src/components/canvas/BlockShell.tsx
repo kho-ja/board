@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent } from 'react'
 
-import type { BlockData, Vec } from '#/types'
+import type { BlockData, SchemaDef, Vec } from '#/types'
 import type { TextBlockData } from '#/types'
 import { TextBlockEditor } from '#/blocks/text/TextBlock'
 
@@ -38,6 +38,7 @@ export interface ObservableMembership {
 interface BlockShellProps {
   block: ObservableBlock
   placement: ObservablePlacement
+  schema?: SchemaDef | null
   onDragEnd: (position: Vec) => void
   onCommitText?: (blockId: string, markdown: string) => void
   onSelect?: (blockId: string) => void
@@ -69,6 +70,7 @@ function groupAcceptsDrop(e: ReactDragEvent<HTMLElement>): boolean {
 export function BlockShell({
   block,
   placement,
+  schema,
   onDragEnd,
   onCommitText,
   onSelect,
@@ -118,113 +120,117 @@ export function BlockShell({
 
     // Modifier-click toggles membership without starting a drag (Figma-like
     // additive selection with ctrl/cmd; we also accept shift).
-    if ((e.ctrlKey || e.metaKey || e.shiftKey) && onToggleSelect) {
-      onToggleSelect(block.id)
-      e.preventDefault()
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
       e.stopPropagation()
+      onToggleSelect?.(block.id)
       return
     }
 
     onSelect?.(block.id)
-    e.preventDefault()
     e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+
     dragRef.current = {
       pointerId: e.pointerId,
       startScreen: { x: e.clientX, y: e.clientY },
       startWorld: { x: placement.positionX, y: placement.positionY },
     }
-    lastPosRef.current = null
-    lastClientRef.current = null
-    dropTargetRef.current = null
-    onDropTargetChange?.(null)
-    setDragTarget(false)
-    e.currentTarget.setPointerCapture(e.pointerId)
+    lastPosRef.current = { x: placement.positionX, y: placement.positionY }
     setDragging(true)
   }
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current
-    if (!drag || e.pointerId !== drag.pointerId) return
-    e.preventDefault()
-    const position = {
-      x: drag.startWorld.x + (e.clientX - drag.startScreen.x) / scaleRef.current,
-      y: drag.startWorld.y + (e.clientY - drag.startScreen.y) / scaleRef.current,
+    if (!drag || drag.pointerId !== e.pointerId) return
+
+    const s = scaleRef.current || 1
+    const dx = (e.clientX - drag.startScreen.x) / s
+    const dy = (e.clientY - drag.startScreen.y) / s
+    const next: Vec = {
+      x: Math.round(drag.startWorld.x + dx),
+      y: Math.round(drag.startWorld.y + dy),
     }
-    lastPosRef.current = position
+
+    lastPosRef.current = next
     lastClientRef.current = { x: e.clientX, y: e.clientY }
-    const target =
-      computeDropTarget?.(position, { x: e.clientX, y: e.clientY }, block.id) ??
-      null
-    const prev = dropTargetRef.current
-    const same =
-      (target === null && prev === null) ||
-      (target !== null &&
-        prev !== null &&
-        target.type === prev.type &&
-        (target.type !== 'group' ||
-          target.groupId === (prev as { groupId: string }).groupId))
-    if (!same) {
-      dropTargetRef.current = target
-      onDropTargetChange?.(target)
-    }
+
     if (rafRef.current == null) {
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null
-        if (lastPosRef.current) applyPosition(lastPosRef.current)
+        if (lastPosRef.current) {
+          applyPosition(lastPosRef.current)
+          if (computeDropTarget && lastClientRef.current) {
+            const target = computeDropTarget(
+              lastPosRef.current,
+              lastClientRef.current,
+              block.id,
+            )
+            dropTargetRef.current = target
+            onDropTargetChange?.(target)
+          }
+        }
       })
     }
   }
 
   const finishDrag = (e: ReactPointerEvent<HTMLDivElement>, commit: boolean) => {
     const drag = dragRef.current
-    if (!drag || e.pointerId !== drag.pointerId) return
-    dragRef.current = null
-    e.preventDefault()
-    e.stopPropagation()
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    } catch {
-      // pointer may already have been released
+    if (!drag || drag.pointerId !== e.pointerId) return
+
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        // Pointer might already be released
+      }
     }
+
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+
+    const finalPos = lastPosRef.current ?? {
+      x: placement.positionX,
+      y: placement.positionY,
+    }
+
+    dragRef.current = null
+    lastPosRef.current = null
+    setDragging(false)
+
     const target = dropTargetRef.current
     dropTargetRef.current = null
     onDropTargetChange?.(null)
-    setDragTarget(false)
-    setDragging(false)
-    const pos = commit && lastPosRef.current ? lastPosRef.current : null
-    if (
-      pos &&
-      target &&
-      lastClientRef.current &&
-      target.type === 'group' &&
-      onDropBlockOnGroup
-    ) {
-      onDropBlockOnGroup(target.groupId, block.id, lastClientRef.current)
+
+    if (commit) {
+      if (target?.type === 'group' && onDropBlockOnGroup && lastClientRef.current) {
+        onDropBlockOnGroup(target.groupId, block.id, lastClientRef.current)
+        applyPosition({ x: placement.positionX, y: placement.positionY })
+      } else {
+        applyPosition(finalPos)
+        onDragEnd(finalPos)
+      }
+    } else {
       applyPosition({ x: placement.positionX, y: placement.positionY })
-      lastClientRef.current = null
-      return
-    }
-    lastClientRef.current = null
-    if (commit && lastPosRef.current) {
-      onDragEnd(lastPosRef.current)
     }
   }
 
-  const enterEdit = () => {
-    if (block.kind !== 'text' || !onCommitText) return
+  const isText = block.kind === 'text'
+  const isGroup = block.kind === 'file-group'
+  const isObject = !isText && !isGroup && block.kind !== 'file'
+  const canReceiveDrop = isGroup && (Boolean(onDropFilesOnGroup) || Boolean(onDropBlockOnGroup))
+
+  const enterEdit = (e: React.MouseEvent) => {
+    if (!isText) return
+    e.stopPropagation()
     setEditing(true)
   }
 
   const commitText = (markdown: string) => {
     setEditing(false)
-    if (onCommitText && markdown.trim() !== (block.data as TextBlockData).markdown) {
-      onCommitText(block.id, markdown)
-    }
+    onCommitText?.(block.id, markdown)
   }
-
-  const isGroup = block.kind === 'file-group'
-  const isText = block.kind === 'text'
-  const canReceiveDrop = isGroup && (!!onDropFilesOnGroup || !!onDropBlockOnGroup)
 
   const stopTarget = () => {
     dragDepthRef.current = 0
@@ -234,6 +240,7 @@ export function BlockShell({
   const onGroupDragEnter = (e: ReactDragEvent<HTMLDivElement>) => {
     if (!groupAcceptsDrop(e)) return
     e.preventDefault()
+    e.stopPropagation()
     dragDepthRef.current += 1
     setDragTarget(true)
   }
@@ -272,7 +279,7 @@ export function BlockShell({
   return (
     <div
       ref={elRef}
-      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}`}
+      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}`}
       style={{ left: placement.positionX, top: placement.positionY }}
       data-block-id={block.id}
       onPointerDown={onPointerDown}
@@ -296,6 +303,7 @@ export function BlockShell({
         <>
           <BlockRenderer
             block={block}
+            schema={schema}
             members={members}
             onGroupViewChange={
               onGroupViewChange ? (view) => onGroupViewChange(block.id, view) : undefined

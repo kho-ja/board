@@ -4,9 +4,14 @@ import { FileImport } from './FileImport'
 interface TopBarProps {
   onPickFiles?: (files: File[]) => void
   onCreateGroup?: () => void
+  onCreateType?: () => void
 }
 
-export function TopBar({ onPickFiles, onCreateGroup }: TopBarProps) {
+export function TopBar({
+  onPickFiles,
+  onCreateGroup,
+  onCreateType,
+}: TopBarProps) {
   return (
     <header className="board-topbar">
       <div className="brand">
@@ -18,6 +23,16 @@ export function TopBar({ onPickFiles, onCreateGroup }: TopBarProps) {
       </div>
       <div className="topbar-actions">
         <span className="topbar-hint">V Move · H Hand · T Text · Space pan</span>
+        {onCreateType && (
+          <button
+            type="button"
+            className="group-create-button"
+            onClick={onCreateType}
+            title="Create a custom object type schema"
+          >
+            + Type
+          </button>
+        )}
         {onCreateGroup && (
           <button
             type="button"

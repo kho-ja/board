@@ -29,9 +29,13 @@ import {
   zoomAt,
 } from '#/lib/canvas/transform'
 import type { Vec, WorldRect } from '#/lib/canvas/transform'
+import { SchemaCreator } from '#/components/schema/SchemaCreator'
 import type {
   BlockData,
+  FieldValue,
   FileGroupBlockData,
+  ObjectBlockData,
+  SchemaDef,
   TextBlockData,
 } from '#/types'
 import type { Collections } from '#/collections'
@@ -43,6 +47,7 @@ export const Route = createFileRoute('/')({
       context.collections.blocksCollection.preload(),
       context.collections.placementsCollection.preload(),
       context.collections.membershipsCollection.preload(),
+      context.collections.typesCollection.preload(),
     ])
     return null
   },
@@ -53,13 +58,16 @@ const BLOCK_WIDTH = 180
 const BLOCK_HEIGHT = 92
 const GROUP_WIDTH = 280
 const GROUP_HEIGHT = 220
+const OBJECT_WIDTH = 240
+const OBJECT_HEIGHT = 160
 const GRID_SPACING = 70
 const DEFAULT_TEXT = 'Text'
 
-const sizeForBlock = (kind: string) =>
-  kind === 'file-group'
-    ? { width: GROUP_WIDTH, height: GROUP_HEIGHT }
-    : { width: BLOCK_WIDTH, height: BLOCK_HEIGHT }
+const sizeForBlock = (kind: string) => {
+  if (kind === 'file-group') return { width: GROUP_WIDTH, height: GROUP_HEIGHT }
+  if (kind === 'file' || kind === 'text') return { width: BLOCK_WIDTH, height: BLOCK_HEIGHT }
+  return { width: OBJECT_WIDTH, height: OBJECT_HEIGHT }
+}
 
 const updatePlacement = (
   collections: Collections,
@@ -100,6 +108,10 @@ function BoardPage() {
     query: (q) => q.from({ membership: collections.membershipsCollection }),
   })
 
+  const { data: types } = useLiveQuery({
+    query: (q) => q.from({ type: collections.typesCollection }),
+  })
+
   const placedIds = useMemo(() => new Set(placements.map((p) => p.blockId)), [placements])
   const unplaced = useMemo(
     () => blocks.filter((block) => !placedIds.has(block.id)),
@@ -113,6 +125,7 @@ function BoardPage() {
         placements={placements}
         memberships={memberships}
         unplaced={unplaced}
+        types={types}
         collections={collections}
       />
     </ViewportProvider>
@@ -124,10 +137,11 @@ interface BoardProps {
   placements: ObservablePlacement[]
   memberships: ObservableMembership[]
   unplaced: ObservableBlock[]
+  types: SchemaDef[]
   collections: Collections
 }
 
-function Board({ blocks, placements, memberships, unplaced, collections }: BoardProps) {
+function Board({ blocks, placements, memberships, unplaced, types, collections }: BoardProps) {
   const { ref: containerRef, width, height } = useElementSize<HTMLDivElement>()
   const { viewport, setViewport } = useViewport()
   const [tool, setTool] = useState<Tool>('move')
@@ -136,6 +150,92 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
   const [activeDrop, setActiveDrop] = useState<DropTarget | null>(null)
   const forcePan = tool === 'hand' || spaceHeld
   const { runRecorded, undo, redo } = useUndoRedo()
+
+  const typesById = useMemo(
+    () => new Map(types.map((t) => [t.id, t])),
+    [types],
+  )
+
+  const [schemaCreatorOpen, setSchemaCreatorOpen] = useState(false)
+  const [schemaToEdit, setSchemaToEdit] = useState<SchemaDef | null>(null)
+
+  const handleOpenSchemaCreator = useCallback((schema?: SchemaDef) => {
+    setSchemaToEdit(schema ?? null)
+    setSchemaCreatorOpen(true)
+  }, [])
+
+  const handleCloseSchemaCreator = useCallback(() => {
+    setSchemaCreatorOpen(false)
+    setSchemaToEdit(null)
+  }, [])
+
+  const handleSaveSchema = useCallback(
+    (schema: SchemaDef) => {
+      const existing = types.find((t) => t.id === schema.id)
+      if (existing) {
+        runRecorded(
+          `Update type ${schema.name}`,
+          () => {
+            collections.typesCollection.update(schema.id, (draft) => {
+              draft.name = schema.name
+              draft.fields = schema.fields
+              draft.defaultView = schema.defaultView
+            })
+          },
+          () => {
+            collections.typesCollection.update(schema.id, (draft) => {
+              draft.name = existing.name
+              draft.fields = existing.fields
+              draft.defaultView = existing.defaultView
+            })
+          },
+          () => {
+            collections.typesCollection.update(schema.id, (draft) => {
+              draft.name = schema.name
+              draft.fields = schema.fields
+              draft.defaultView = schema.defaultView
+            })
+          },
+        )
+      } else {
+        runRecorded(
+          `Create type ${schema.name}`,
+          () => {
+            collections.typesCollection.insert(schema)
+          },
+          () => {
+            collections.typesCollection.delete(schema.id)
+          },
+          () => {
+            collections.typesCollection.insert(schema)
+          },
+        )
+      }
+    },
+    [collections, runRecorded, types],
+  )
+
+  const handleDeleteType = useCallback(
+    (typeId: string) => {
+      const target = types.find((t) => t.id === typeId)
+      if (!target) return
+      runRecorded(
+        `Delete type ${target.name}`,
+        () => {
+          collections.typesCollection.delete(typeId)
+        },
+        () => {
+          collections.typesCollection.insert(target)
+        },
+        () => {
+          collections.typesCollection.delete(typeId)
+        },
+      )
+    },
+    [collections, runRecorded, types],
+  )
+
+
 
   const visibleRect = useMemo<WorldRect | null>(
     () => (width > 0 && height > 0 ? visibleWorldRect(viewport, width, height) : null),
@@ -242,6 +342,81 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
     }
     return screenToWorld(viewport, { x: width / 2, y: height / 2 })
   }, [height, viewport, width])
+
+  const handleCreateInstance = useCallback(
+    (schemaId: string) => {
+      const typeDef = types.find((t) => t.id === schemaId)
+      if (!typeDef) return
+      const blockId = crypto.randomUUID()
+      const center = viewCenter()
+      const size = sizeForBlock(schemaId)
+      const newBlock: ObservableBlock = {
+        id: blockId,
+        kind: schemaId,
+        data: {
+          kind: schemaId,
+          schemaId,
+          values: {},
+        },
+        schemaVersion: '1',
+      }
+      const newPlacement: ObservablePlacement = {
+        blockId,
+        positionX: Math.round(center.x - size.width / 2),
+        positionY: Math.round(center.y - size.height / 2),
+      }
+
+      runRecorded(
+        `Add ${typeDef.name}`,
+        () => {
+          const tx = collections.blocksCollection.insert(newBlock)
+          void tx.isPersisted.promise.then(() => {
+            collections.placementsCollection.insert(newPlacement)
+          })
+        },
+        () => {
+          collections.placementsCollection.delete(blockId)
+          collections.blocksCollection.delete(blockId)
+        },
+        () => {
+          const tx = collections.blocksCollection.insert(newBlock)
+          void tx.isPersisted.promise.then(() => {
+            collections.placementsCollection.insert(newPlacement)
+          })
+        },
+      )
+      setTool('move')
+      setSelectedIds(new Set([blockId]))
+    },
+    [collections, runRecorded, types, viewCenter],
+  )
+
+  const handleUpdateObjectValues = useCallback(
+    (blockId: string, values: Record<string, FieldValue>) => {
+      const block = byId.get(blockId)
+      if (!block) return
+      const prevData = block.data as ObjectBlockData
+      const nextData: ObjectBlockData = {
+        ...prevData,
+        values,
+      }
+
+      runRecorded(
+        'Edit field values',
+        () => {
+          updateBlockData(collections, blockId, nextData)
+        },
+        () => {
+          updateBlockData(collections, blockId, prevData)
+        },
+        () => {
+          updateBlockData(collections, blockId, nextData)
+        },
+      )
+    },
+    [byId, collections, runRecorded],
+  )
+
 
   const handleDragEnd = (blockId: string, position: Vec) => {
     const existing = placements.find((p) => p.blockId === blockId)
@@ -899,6 +1074,7 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
       <TopBar
         onPickFiles={pickFiles}
         onCreateGroup={() => void createGroup()}
+        onCreateType={() => handleOpenSchemaCreator()}
       />
       <div className="board-main">
         <ToolRail tool={tool} onSelect={setTool} />
@@ -911,9 +1087,13 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
               !!entry.block,
           )}
           unplaced={unplaced}
+          types={types}
           selectedIds={selectedIds}
           onSelect={selectOnly}
           onPlaceAsset={handlePlaceAsset}
+          onOpenSchemaCreator={handleOpenSchemaCreator}
+          onCreateInstance={handleCreateInstance}
+          onDeleteType={handleDeleteType}
         />
         <div className="canvas-area">
           <Canvas
@@ -932,6 +1112,10 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
                 key={block.id}
                 block={block}
                 placement={placement}
+                schema={
+                  typesById.get(block.kind) ??
+                  typesById.get((block.data as ObjectBlockData).schemaId)
+                }
                 onDragEnd={(position) => handleDragEnd(block.id, position)}
                 onCommitText={commitText}
                 onSelect={selectOnly}
@@ -953,10 +1137,13 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
         </div>
         <Inspector
           selected={selectedBlocks}
+          types={types}
           onUpdatePosition={handleUpdatePosition}
           onUnplace={handleUnplace}
           onDeleteGroup={handleDeleteGroup}
           onRenameGroup={handleRenameGroup}
+          onUpdateObjectValues={handleUpdateObjectValues}
+          onEditSchema={handleOpenSchemaCreator}
           membersByGroup={membersByGroup}
         />
       </div>
@@ -970,6 +1157,12 @@ function Board({ blocks, placements, memberships, unplaced, collections }: Board
           setViewport(DEFAULT_VIEWPORT)
           setSelectedIds(new Set())
         }}
+      />
+      <SchemaCreator
+        isOpen={schemaCreatorOpen}
+        schema={schemaToEdit}
+        onClose={handleCloseSchemaCreator}
+        onSave={handleSaveSchema}
       />
     </div>
   )

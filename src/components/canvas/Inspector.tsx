@@ -1,15 +1,27 @@
 import { useEffect, useState } from 'react'
 
-import type { FileGroupBlockData } from '#/types'
+import { ObjectEditPanel } from '#/blocks/object/ObjectEditPanel'
+import type {
+  FieldValue,
+  FileGroupBlockData,
+  ObjectBlockData,
+  SchemaDef,
+} from '#/types'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
 interface InspectorProps {
   selected: { block: ObservableBlock; placement: ObservablePlacement | null }[]
+  types?: readonly SchemaDef[]
   onUpdatePosition: (blockId: string, x: number, y: number) => void
   onUnplace?: (blockId: string) => void
   onDeleteGroup?: (groupId: string) => void
   onRenameGroup?: (blockId: string, name: string) => void
+  onUpdateObjectValues?: (
+    blockId: string,
+    values: Record<string, FieldValue>,
+  ) => void
+  onEditSchema?: (schema: SchemaDef) => void
   membersByGroup?: ReadonlyMap<string, ObservableBlock[]>
 }
 
@@ -19,10 +31,13 @@ function round(v: number): string {
 
 export function Inspector({
   selected,
+  types,
   onUpdatePosition,
   onUnplace,
   onDeleteGroup,
   onRenameGroup,
+  onUpdateObjectValues,
+  onEditSchema,
   membersByGroup,
 }: InspectorProps) {
   if (selected.length === 0) {
@@ -60,14 +75,26 @@ export function Inspector({
 
   const { block, placement } = selected[0]
   const isGroup = block.kind === 'file-group'
+  const isText = block.kind === 'text'
+  const isFile = block.kind === 'file'
+  const isObject = !isGroup && !isText && !isFile
+
   const groupData = isGroup ? (block.data as FileGroupBlockData) : null
+  const objectData = isObject ? (block.data as ObjectBlockData) : null
+  const objectSchema = isObject
+    ? types?.find(
+        (t) => t.id === objectData?.schemaId || t.id === block.kind,
+      ) ?? null
+    : null
   const memberCount = isGroup ? (membersByGroup?.get(block.id)?.length ?? 0) : 0
 
   return (
     <aside className="inspector">
       <div className="inspector-head">
-        <span className="inspector-kind">{block.kind}</span>
-        <h2 className="inspector-title">{blockTitle(block)}</h2>
+        <span className="inspector-kind">
+          {isObject ? objectSchema?.name ?? block.kind : block.kind}
+        </span>
+        <h2 className="inspector-title">{blockTitle(block, types)}</h2>
       </div>
 
       {isGroup && groupData && (
@@ -76,6 +103,16 @@ export function Inspector({
           name={groupData.name}
           memberCount={memberCount}
           onRenameGroup={onRenameGroup}
+        />
+      )}
+
+      {isObject && objectData && onUpdateObjectValues && (
+        <ObjectEditPanel
+          blockId={block.id}
+          data={objectData}
+          schema={objectSchema}
+          onUpdateValues={onUpdateObjectValues}
+          onEditSchema={onEditSchema}
         />
       )}
 
@@ -149,18 +186,18 @@ function GroupPanel({
       <input
         id={`group-name-${blockId}`}
         className="inspector-input"
-        type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
+            commit()
             e.currentTarget.blur()
           }
         }}
       />
       <p className="inspector-hint">
-        {memberCount} {memberCount === 1 ? 'file' : 'files'} in this group
+        {memberCount} {memberCount === 1 ? 'file' : 'files'}
       </p>
     </div>
   )
@@ -176,22 +213,28 @@ function ConfirmDeleteGroupButton({
   const [armed, setArmed] = useState(false)
 
   useEffect(() => {
-    setArmed(false)
-  }, [groupId])
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
+
+  const onClick = () => {
+    if (!armed) {
+      setArmed(true)
+    } else {
+      onDeleteGroup(groupId)
+      setArmed(false)
+    }
+  }
 
   return (
     <button
       type="button"
       className={`inspector-btn danger${armed ? ' is-armed' : ''}`}
-      onClick={() => {
-        if (armed) {
-          onDeleteGroup(groupId)
-        } else {
-          setArmed(true)
-        }
-      }}
+      onClick={onClick}
+      title="Delete this group. Files inside will be moved to the canvas."
     >
-      {armed ? 'Click again to confirm' : 'Delete group'}
+      {armed ? 'Click again to confirm delete' : 'Delete group'}
     </button>
   )
 }
