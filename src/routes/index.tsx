@@ -498,12 +498,12 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
   }
 
   const addTextAt = useCallback(
-    async (world: Vec) => {
+    async (world: Vec, initialText = DEFAULT_TEXT) => {
       const id = crypto.randomUUID()
       const block = {
         id,
         kind: 'text',
-        data: { kind: 'text', markdown: DEFAULT_TEXT } satisfies TextBlockData,
+        data: { kind: 'text', markdown: initialText } satisfies TextBlockData,
         schemaVersion: '1',
       }
       const placement = {
@@ -899,28 +899,55 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
     [blocks, collections, runRecorded],
   )
 
-  const handleUnplace = useCallback(
-    (blockId: string) => {
-      const existing = placements.find((p) => p.blockId === blockId)
-      if (!existing) return
-      const placement: ObservablePlacement = {
-        blockId: existing.blockId,
-        positionX: existing.positionX,
-        positionY: existing.positionY,
+  const handleUnplaceBlocks = useCallback(
+    (blockIds: Iterable<string>) => {
+      const ids = Array.from(blockIds)
+      const toUnplace: ObservablePlacement[] = []
+      for (const id of ids) {
+        const existing = placements.find((p) => p.blockId === id)
+        if (existing) {
+          toUnplace.push({
+            blockId: existing.blockId,
+            positionX: existing.positionX,
+            positionY: existing.positionY,
+          })
+        }
       }
+      if (toUnplace.length === 0) return
+      const label =
+        toUnplace.length === 1 ? 'Remove from board' : `Remove ${toUnplace.length} blocks`
       runRecorded(
-        'Remove from board',
-        () => void collections.placementsCollection.delete(blockId),
-        () => void collections.placementsCollection.insert(placement),
-        () => void collections.placementsCollection.delete(blockId),
+        label,
+        () => {
+          for (const p of toUnplace) {
+            collections.placementsCollection.delete(p.blockId)
+          }
+        },
+        () => {
+          for (const p of toUnplace) {
+            collections.placementsCollection.insert(p)
+          }
+        },
+        () => {
+          for (const p of toUnplace) {
+            collections.placementsCollection.delete(p.blockId)
+          }
+        },
       )
       setSelectedIds((prev) => {
         const next = new Set(prev)
-        next.delete(blockId)
+        for (const p of toUnplace) next.delete(p.blockId)
         return next
       })
     },
     [collections, placements, runRecorded],
+  )
+
+  const handleUnplace = useCallback(
+    (blockId: string) => {
+      handleUnplaceBlocks([blockId])
+    },
+    [handleUnplaceBlocks],
   )
 
   const handleDeleteGroup = useCallback(
@@ -1011,9 +1038,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
       if (key === 'backspace' || key === 'delete') {
         if (selectedIds.size > 0) {
           event.preventDefault()
-          for (const id of selectedIds) {
-            handleUnplace(id)
-          }
+          handleUnplaceBlocks(selectedIds)
         }
       }
     }
@@ -1021,13 +1046,36 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
       if (event.code === 'Space') setSpaceHeld(false)
     }
 
+    const onPaste = (event: ClipboardEvent) => {
+      if (isTyping(event.target)) return
+      const clipboardData = event.clipboardData
+      if (!clipboardData) return
+
+      if (clipboardData.files && clipboardData.files.length > 0) {
+        event.preventDefault()
+        const files = Array.from(clipboardData.files)
+        const center = viewCenter()
+        void importFiles(files, center)
+        return
+      }
+
+      const text = clipboardData.getData('text/plain')
+      if (text && text.trim()) {
+        event.preventDefault()
+        const center = viewCenter()
+        void addTextAt(center, text.trim())
+      }
+    }
+
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('paste', onPaste)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('paste', onPaste)
     }
-  }, [undo, redo, selectedIds, handleUnplace])
+  }, [undo, redo, selectedIds, handleUnplaceBlocks, importFiles, viewCenter, addTextAt])
 
   const onPress = useCallback(
     (world: Vec) => {
@@ -1131,6 +1179,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
                 isGroupDropTarget={
                   activeDrop?.type === 'group' && activeDrop.groupId === block.id
                 }
+                onEditSchema={handleOpenSchemaCreator}
               />
             ))}
           </Canvas>

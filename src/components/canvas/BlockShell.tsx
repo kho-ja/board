@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent } from 'react'
 
-import type { BlockData, SchemaDef, Vec } from '#/types'
+import type { BlockData, FileGroupBlockData, SchemaDef, Vec } from '#/types'
 import type { TextBlockData } from '#/types'
 import { TextBlockEditor } from '#/blocks/text/TextBlock'
 
@@ -60,6 +60,7 @@ interface BlockShellProps {
   onDropTargetChange?: (target: DropTarget | null) => void
   onDropBlockOnGroup?: (groupId: string, blockId: string, client: Vec) => void
   isGroupDropTarget?: boolean
+  onEditSchema?: (schema: SchemaDef) => void
 }
 
 function groupAcceptsDrop(e: ReactDragEvent<HTMLElement>): boolean {
@@ -84,6 +85,7 @@ export function BlockShell({
   onDropTargetChange,
   onDropBlockOnGroup,
   isGroupDropTarget = false,
+  onEditSchema,
 }: BlockShellProps) {
   const { viewport } = useViewport()
 
@@ -222,10 +224,27 @@ export function BlockShell({
   const canReceiveDrop = isGroup && (Boolean(onDropFilesOnGroup) || Boolean(onDropBlockOnGroup))
 
   const enterEdit = (e: React.MouseEvent) => {
-    if (!isText) return
     e.stopPropagation()
-    setEditing(true)
+    if (isText) {
+      setEditing(true)
+    } else if (isGroup) {
+      if (onGroupViewChange) {
+        const groupData = block.data as FileGroupBlockData
+        const nextView = groupData.currentView === 'card' ? 'list' : 'card'
+        onGroupViewChange(block.id, nextView)
+      }
+    } else if (isObject && schema && onEditSchema) {
+      onEditSchema(schema)
+    }
   }
+
+  const blockHint = isText
+    ? 'Double-click to edit text'
+    : isGroup
+      ? 'Double-click to toggle group layout (card/list)'
+      : isObject
+        ? 'Double-click to edit object type schema'
+        : undefined
 
   const commitText = (markdown: string) => {
     setEditing(false)
@@ -287,7 +306,7 @@ export function BlockShell({
       onPointerUp={(e) => finishDrag(e, true)}
       onPointerCancel={(e) => finishDrag(e, false)}
       onDoubleClick={enterEdit}
-      title={isText ? 'Double-click to edit' : undefined}
+      title={blockHint}
       onDragEnter={canReceiveDrop ? onGroupDragEnter : undefined}
       onDragOver={canReceiveDrop ? onGroupDragOver : undefined}
       onDragLeave={canReceiveDrop ? onGroupDragLeave : undefined}

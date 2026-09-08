@@ -22,6 +22,9 @@ export function StatusBar({
       <span className="status-counts">
         {placedCount} placed · {blockCount} total
       </span>
+      <span className="status-hint" aria-hidden="true">
+        <kbd>V</kbd> Move &middot; <kbd>H</kbd> Hand &middot; <kbd>T</kbd> Text &middot; <kbd>Space</kbd> Pan &middot; <kbd>Del</kbd> Unplace &middot; <kbd>Ctrl+Z</kbd> Undo
+      </span>
       <div className="zoom-cluster">
         <button type="button" className="chrome-icon" onClick={onZoomOut} aria-label="Zoom out">
           −
