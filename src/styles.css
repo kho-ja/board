@@ -1898,6 +1898,30 @@ a {
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 35%, transparent);
 }
 
+.dock-place-files-btn {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--sea-ink);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 120ms ease;
+}
+
+.dock-place-files-btn:hover {
+  border-color: var(--lagoon);
+  background: color-mix(in oklab, var(--lagoon) 14%, var(--surface));
+  color: var(--lagoon-deep);
+}
+
 .dock-category-divider {
   display: flex;
   align-items: center;

@@ -7,6 +7,7 @@ import type {
 
 import { getAssetCategory } from '#/lib/assets/categories'
 import type { FileBlockData, SchemaDef } from '#/types'
+import { FileImport } from './FileImport'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
@@ -46,6 +47,7 @@ interface LeftDockProps {
   onSelect: (blockId: string) => void
   onPlaceAsset?: (blockId: string) => void
   onDeleteAsset?: (blockId: string) => void
+  onPickFiles?: (files: File[]) => void
   onOpenSchemaCreator?: (schema?: SchemaDef) => void
   onCreateInstance?: (schemaId: string) => void
   onDeleteType?: (schemaId: string) => void
@@ -61,6 +63,7 @@ export function LeftDock({
   onSelect,
   onPlaceAsset,
   onDeleteAsset,
+  onPickFiles,
   onOpenSchemaCreator,
   onCreateInstance,
   onDeleteType,
@@ -136,8 +139,12 @@ export function LeftDock({
     })
   }, [unplaced, types, assetSort])
 
+  const prevUnplacedCount = useRef(unplaced.length)
   useEffect(() => {
-    if (unplaced.length > 0) setTab('assets')
+    if (unplaced.length > prevUnplacedCount.current && prevUnplacedCount.current === 0) {
+      setTab('assets')
+    }
+    prevUnplacedCount.current = unplaced.length
   }, [unplaced.length, setTab])
 
   useEffect(() => {
@@ -273,38 +280,58 @@ export function LeftDock({
           aria-labelledby="dock-tab-assets"
           hidden={tab !== 'assets'}
         >
-          {unplaced.length > 0 && (
-            <div className="dock-assets-toolbar">
-              <label className="dock-sort-label" htmlFor="dock-asset-sort">
-                Sort <span className="dock-sort-hint">(S)</span>
-              </label>
-              <select
-                id="dock-asset-sort"
-                className="dock-sort-select"
-                value={assetSort}
-                onChange={(e) => setAssetSort(e.target.value as AssetSort)}
-              >
-                <option value="category">Category (Images, Docs, Notes...)</option>
-                <option value="name-asc">Name (A &rarr; Z)</option>
-                <option value="name-desc">Name (Z &rarr; A)</option>
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="size">Size (Large &rarr; Small)</option>
-              </select>
-            </div>
-          )}
+          <div className="dock-assets-toolbar">
+            {unplaced.length > 0 && (
+              <>
+                <label className="dock-sort-label" htmlFor="dock-asset-sort">
+                  Sort <span className="dock-sort-hint">(S)</span>
+                </label>
+                <select
+                  id="dock-asset-sort"
+                  className="dock-sort-select"
+                  value={assetSort}
+                  onChange={(e) => setAssetSort(e.target.value as AssetSort)}
+                >
+                  <option value="category">Category (Images, Docs, Notes...)</option>
+                  <option value="name-asc">Name (A &rarr; Z)</option>
+                  <option value="name-desc">Name (Z &rarr; A)</option>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="size">Size (Large &rarr; Small)</option>
+                </select>
+              </>
+            )}
+            {onPickFiles && (
+              <FileImport
+                onPick={onPickFiles}
+                label="+ Place files"
+                className="dock-place-files-btn"
+              />
+            )}
+          </div>
           <NavList
             idPrefix="asset"
             items={sortedUnplaced}
             getKey={(b: ObservableBlock) => b.id}
             activeIndex={assetsActive}
             onActiveIndexChange={setAssetsActive}
-            onSelect={onPlaceAsset}
+            onAction={onPlaceAsset}
             onDelete={onDeleteAsset}
             onCycleSort={cycleSort}
             selectedKeys={new Set()}
             label="Unplaced assets"
-            empty="Nothing waiting. New text lands on the canvas."
+            empty={
+              <div className="dock-empty">
+                <p>Nothing waiting.</p>
+                {onPickFiles && (
+                  <FileImport
+                    onPick={onPickFiles}
+                    label="Place files on board"
+                    className="dock-empty-cta"
+                  />
+                )}
+              </div>
+            }
             renderContent={(block: ObservableBlock, active, _selected, index) => {
               const title = blockTitle(block, types)
               const isFile = block.kind === 'file'
@@ -362,7 +389,7 @@ export function LeftDock({
                           title="Place on board (Enter)"
                           aria-label={`Place ${title} on board`}
                         >
-                          + Add
+                          + Place
                         </button>
                       )}
                       {onDeleteAsset && (
@@ -479,6 +506,7 @@ interface NavListProps<T> {
   activeIndex: number
   onActiveIndexChange: (index: number) => void
   onSelect?: (key: string) => void
+  onAction?: (key: string) => void
   onDelete?: (key: string) => void
   onCycleSort?: () => void
   selectedKeys: ReadonlySet<string>
@@ -501,6 +529,7 @@ function NavList<T>({
   activeIndex,
   onActiveIndexChange,
   onSelect,
+  onAction,
   onDelete,
   onCycleSort,
   selectedKeys,
@@ -511,7 +540,7 @@ function NavList<T>({
   const listRef = useRef<HTMLUListElement>(null)
   const optionId = (index: number) => `${idPrefix}-option-${index}`
 
-  const activate = (index: number) => {
+  const moveFocus = (index: number) => {
     if (items.length === 0) return
     const clamped = Math.max(0, Math.min(index, items.length - 1))
     onActiveIndexChange(clamped)
@@ -526,25 +555,29 @@ function NavList<T>({
     switch (key) {
       case 'arrowdown':
         e.preventDefault()
-        activate(activeIndex + 1)
+        moveFocus(activeIndex + 1)
         break
       case 'arrowup':
         e.preventDefault()
-        activate(activeIndex - 1)
+        moveFocus(activeIndex - 1)
         break
       case 'home':
         e.preventDefault()
-        activate(0)
+        moveFocus(0)
         break
       case 'end':
         e.preventDefault()
-        activate(last)
+        moveFocus(last)
         break
       case 'enter':
       case ' ':
-        // Space scrolls the page by default; stop it once we're in the list.
+        // Enter / Space executes the primary action (place or select)
         e.preventDefault()
-        activate(activeIndex)
+        if (onAction && items[activeIndex]) {
+          onAction(getKey(items[activeIndex]))
+        } else if (onSelect && items[activeIndex]) {
+          onSelect(getKey(items[activeIndex]))
+        }
         break
       case 'delete':
       case 'backspace':
@@ -566,11 +599,11 @@ function NavList<T>({
 
   const onOptionClick = (e: ReactMouseEvent, index: number) => {
     // Keep focus on the listbox container so arrow navigation keeps working,
-    // but don't activate selection if clicking an inner interactive control.
+    // but don't activate action if clicking an inner interactive control.
     if ((e.target as HTMLElement).closest('button')) return
     e.preventDefault()
     listRef.current?.focus()
-    activate(index)
+    moveFocus(index)
   }
 
   return (
