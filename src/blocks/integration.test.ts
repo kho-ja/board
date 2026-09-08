@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ObservableBlock, ObservablePlacement } from '#/components/canvas/BlockShell'
-import type { Vec } from '#/types'
+import { getAssetCategory } from '#/lib/assets/categories'
+import type { SchemaDef, Vec } from '#/types'
 
 describe('Board Actions: Integration, Assets & Sorting', () => {
   it('batches multi-selection unplace into a single undo/redo transaction', () => {
@@ -53,11 +54,85 @@ describe('Board Actions: Integration, Assets & Sorting', () => {
       v: 'move',
       h: 'hand',
       t: 'text',
+      a: 'assets',
     }
 
     expect(shortcuts['v']).toBe('move')
     expect(shortcuts['h']).toBe('hand')
     expect(shortcuts['t']).toBe('text')
+    expect(shortcuts['a']).toBe('assets')
+  })
+
+  it('correctly classifies assets into categories', () => {
+    const customType: SchemaDef = {
+      id: 'task-type',
+      name: 'Task Item',
+      defaultView: 'card',
+      fields: [],
+    }
+
+    const imgBlock: ObservableBlock = {
+      id: '1',
+      kind: 'file',
+      data: { kind: 'file', name: 'diagram.png', size: 120, mimeType: 'image/png' },
+      schemaVersion: '1',
+    }
+    const docBlock: ObservableBlock = {
+      id: '2',
+      kind: 'file',
+      data: { kind: 'file', name: 'spec.pdf', size: 500, mimeType: 'application/pdf' },
+      schemaVersion: '1',
+    }
+    const codeBlock: ObservableBlock = {
+      id: '3',
+      kind: 'file',
+      data: { kind: 'file', name: 'data.json', size: 200, mimeType: 'application/json' },
+      schemaVersion: '1',
+    }
+    const textBlock: ObservableBlock = {
+      id: '4',
+      kind: 'text',
+      data: { kind: 'text', markdown: 'Meeting notes' },
+      schemaVersion: '1',
+    }
+    const customBlock: ObservableBlock = {
+      id: '5',
+      kind: 'object',
+      data: { kind: 'object', schemaId: 'task-type', values: {} },
+      schemaVersion: '1',
+    }
+
+    expect(getAssetCategory(imgBlock)).toBe('Images')
+    expect(getAssetCategory(docBlock)).toBe('Documents')
+    expect(getAssetCategory(codeBlock)).toBe('Code & Data')
+    expect(getAssetCategory(textBlock)).toBe('Notes & Text')
+    expect(getAssetCategory(customBlock, [customType])).toBe('Task Item')
+  })
+
+  it('sorts unplaced assets by category primarily, then by name', () => {
+    const assets: ObservableBlock[] = [
+      { id: '1', kind: 'text', data: { kind: 'text', markdown: 'Zebra Note' }, schemaVersion: '1' },
+      { id: '2', kind: 'file', data: { kind: 'file', name: 'beta.png', size: 100, mimeType: 'image/png' }, schemaVersion: '1' },
+      { id: '3', kind: 'file', data: { kind: 'file', name: 'alpha.png', size: 100, mimeType: 'image/png' }, schemaVersion: '1' },
+      { id: '4', kind: 'file', data: { kind: 'file', name: 'annual-report.pdf', size: 100, mimeType: 'application/pdf' }, schemaVersion: '1' },
+    ]
+
+    const sorted = [...assets].sort((a, b) => {
+      const catA = getAssetCategory(a)
+      const catB = getAssetCategory(b)
+      if (catA !== catB) return catA.localeCompare(catB)
+      const nameA = (a.data as { name?: string; markdown?: string }).name || (a.data as { markdown?: string }).markdown || ''
+      const nameB = (b.data as { name?: string; markdown?: string }).name || (b.data as { markdown?: string }).markdown || ''
+      return nameA.localeCompare(nameB)
+    })
+
+    // Categories in alphabetical order: Documents, Images, Notes & Text
+    expect(getAssetCategory(sorted[0])).toBe('Documents')
+    expect(getAssetCategory(sorted[1])).toBe('Images')
+    expect((sorted[1].data as { name: string }).name).toBe('alpha.png')
+    expect(getAssetCategory(sorted[2])).toBe('Images')
+    expect((sorted[2].data as { name: string }).name).toBe('beta.png')
+    expect(getAssetCategory(sorted[3])).toBe('Notes & Text')
   })
 
   it('sorts unplaced assets by name ascending and descending', () => {

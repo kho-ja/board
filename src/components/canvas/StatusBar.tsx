@@ -20,14 +20,14 @@ export function StatusBar({
   return (
     <footer className="status-bar">
       <span className="status-counts">
-        {placedCount} placed · {blockCount} total
+        {placedCount} placed &middot; {blockCount} total
       </span>
       <span className="status-hint" aria-hidden="true">
-        <kbd>V</kbd> Move &middot; <kbd>H</kbd> Hand &middot; <kbd>T</kbd> Text &middot; <kbd>Space</kbd> Pan &middot; <kbd>Del</kbd> Unplace &middot; <kbd>Ctrl+Z</kbd> Undo
+        <kbd>V</kbd> Move &middot; <kbd>H</kbd> Hand &middot; <kbd>T</kbd> Text &middot; <kbd>A</kbd> Assets &middot; <kbd>Space</kbd> Pan &middot; <kbd>Del</kbd> Unplace &middot; <kbd>Ctrl+Z</kbd> Undo
       </span>
       <div className="zoom-cluster">
         <button type="button" className="chrome-icon" onClick={onZoomOut} aria-label="Zoom out">
-          −
+          &minus;
         </button>
         <button
           type="button"
@@ -41,19 +41,7 @@ export function StatusBar({
         <button type="button" className="chrome-icon" onClick={onZoomIn} aria-label="Zoom in">
           +
         </button>
-        <button
-          type="button"
-          className="zoom-fit"
-          onClick={onReset}
-          title="Reset view"
-          aria-label="Reset view"
-        >
-          ⤢
-        </button>
       </div>
-      <span className="status-viewport">
-        {Math.round(viewport.offset.x)}, {Math.round(viewport.offset.y)}
-      </span>
     </footer>
   )
 }
