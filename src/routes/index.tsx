@@ -146,6 +146,7 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
   const { viewport, setViewport } = useViewport()
   const [tool, setTool] = useState<Tool>('move')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types'>('layers')
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [activeDrop, setActiveDrop] = useState<DropTarget | null>(null)
   const forcePan = tool === 'hand' || spaceHeld
@@ -1113,7 +1114,9 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
       if (key === 'v') setTool('move')
       else if (key === 'h') setTool('hand')
       else if (key === 't') setTool('text')
-      else if (key === 'escape') {
+      else if (key === 'a') {
+        setDockTab((prev) => (prev === 'assets' ? 'layers' : 'assets'))
+      } else if (key === 'escape') {
         setTool('move')
         setSelectedIds(new Set())
       }
@@ -1220,6 +1223,8 @@ function Board({ blocks, placements, memberships, unplaced, types, collections }
           unplaced={unplaced}
           types={types}
           selectedIds={selectedIds}
+          activeTab={dockTab}
+          onTabChange={setDockTab}
           onSelect={selectOnly}
           onPlaceAsset={handlePlaceAsset}
           onDeleteAsset={handleDeleteBlock}

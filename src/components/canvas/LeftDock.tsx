@@ -1,23 +1,33 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   ReactNode,
 } from 'react'
 
+import { getAssetCategory } from '#/lib/assets/categories'
 import type { FileBlockData, SchemaDef } from '#/types'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
-type Tab = 'layers' | 'assets' | 'types'
+export type Tab = 'layers' | 'assets' | 'types'
 
 export type AssetSort =
+  | 'category'
   | 'name-asc'
   | 'name-desc'
-  | 'type'
   | 'newest'
   | 'oldest'
   | 'size'
+
+const SORT_OPTIONS: readonly AssetSort[] = [
+  'category',
+  'name-asc',
+  'name-desc',
+  'newest',
+  'oldest',
+  'size',
+]
 
 function formatSize(bytes?: number): string | null {
   if (bytes === undefined || bytes === null || Number.isNaN(bytes)) return null
@@ -31,6 +41,8 @@ interface LeftDockProps {
   unplaced: ObservableBlock[]
   types?: readonly SchemaDef[]
   selectedIds: ReadonlySet<string>
+  activeTab?: Tab
+  onTabChange?: (tab: Tab) => void
   onSelect: (blockId: string) => void
   onPlaceAsset?: (blockId: string) => void
   onDeleteAsset?: (blockId: string) => void
@@ -44,6 +56,8 @@ export function LeftDock({
   unplaced,
   types = [],
   selectedIds,
+  activeTab,
+  onTabChange,
   onSelect,
   onPlaceAsset,
   onDeleteAsset,
@@ -51,29 +65,54 @@ export function LeftDock({
   onCreateInstance,
   onDeleteType,
 }: LeftDockProps) {
-  const [tab, setTab] = useState<Tab>('layers')
+  const [internalTab, setInternalTab] = useState<Tab>('layers')
+  const tab = activeTab ?? internalTab
+  const setTab = useCallback(
+    (nextTab: Tab) => {
+      if (onTabChange) onTabChange(nextTab)
+      else setInternalTab(nextTab)
+    },
+    [onTabChange],
+  )
+
   const [layersActive, setLayersActive] = useState(0)
   const [assetsActive, setAssetsActive] = useState(0)
-  const [assetSort, setAssetSort] = useState<AssetSort>('name-asc')
+  const [assetSort, setAssetSort] = useState<AssetSort>('category')
+
+  const cycleSort = () => {
+    setAssetSort((current) => {
+      const idx = SORT_OPTIONS.indexOf(current)
+      const nextIdx = (idx + 1) % SORT_OPTIONS.length
+      return SORT_OPTIONS[nextIdx]
+    })
+  }
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const b of unplaced) {
+      const cat = getAssetCategory(b, types)
+      counts.set(cat, (counts.get(cat) ?? 0) + 1)
+    }
+    return counts
+  }, [unplaced, types])
 
   const sortedUnplaced = useMemo(() => {
     const list = [...unplaced]
     return list.sort((a, b) => {
       const titleA = blockTitle(a, types).toLowerCase()
       const titleB = blockTitle(b, types).toLowerCase()
+      const catA = getAssetCategory(a, types)
+      const catB = getAssetCategory(b, types)
 
       switch (assetSort) {
+        case 'category': {
+          if (catA !== catB) return catA.localeCompare(catB)
+          return titleA.localeCompare(titleB)
+        }
         case 'name-asc':
           return titleA.localeCompare(titleB)
         case 'name-desc':
           return titleB.localeCompare(titleA)
-        case 'type': {
-          const typeA = a.kind.toLowerCase()
-          const typeB = b.kind.toLowerCase()
-          return typeA === typeB
-            ? titleA.localeCompare(titleB)
-            : typeA.localeCompare(typeB)
-        }
         case 'newest': {
           const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0
           const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0
@@ -99,7 +138,7 @@ export function LeftDock({
 
   useEffect(() => {
     if (unplaced.length > 0) setTab('assets')
-  }, [unplaced.length])
+  }, [unplaced.length, setTab])
 
   useEffect(() => {
     setLayersActive((i) =>
@@ -237,7 +276,7 @@ export function LeftDock({
           {unplaced.length > 0 && (
             <div className="dock-assets-toolbar">
               <label className="dock-sort-label" htmlFor="dock-asset-sort">
-                Sort
+                Sort <span className="dock-sort-hint">(S)</span>
               </label>
               <select
                 id="dock-asset-sort"
@@ -245,9 +284,9 @@ export function LeftDock({
                 value={assetSort}
                 onChange={(e) => setAssetSort(e.target.value as AssetSort)}
               >
+                <option value="category">Category (Images, Docs, Notes...)</option>
                 <option value="name-asc">Name (A &rarr; Z)</option>
                 <option value="name-desc">Name (Z &rarr; A)</option>
-                <option value="type">Type</option>
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
                 <option value="size">Size (Large &rarr; Small)</option>
@@ -261,65 +300,86 @@ export function LeftDock({
             activeIndex={assetsActive}
             onActiveIndexChange={setAssetsActive}
             onSelect={onPlaceAsset}
+            onDelete={onDeleteAsset}
+            onCycleSort={cycleSort}
             selectedKeys={new Set()}
             label="Unplaced assets"
             empty="Nothing waiting. New text lands on the canvas."
-            renderContent={(block: ObservableBlock, active) => {
+            renderContent={(block: ObservableBlock, active, _selected, index) => {
               const title = blockTitle(block, types)
               const isFile = block.kind === 'file'
               const sizeStr = isFile
                 ? formatSize((block.data as FileBlockData).size)
                 : null
+              const category = getAssetCategory(block, types)
+
+              const isFirstInCategory =
+                assetSort === 'category' &&
+                (index === 0 ||
+                  getAssetCategory(sortedUnplaced[index - 1], types) !== category)
 
               return (
-                <div
-                  className="asset-row"
-                  data-active={active || undefined}
-                  draggable="true"
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(
-                      'application/x-khoja-block-id',
-                      block.id,
-                    )
-                    e.dataTransfer.effectAllowed = 'copy'
-                  }}
-                >
-                  <div className="asset-row-main">
-                    <span className="layer-chip" aria-hidden="true" />
-                    <span className="layer-name" title={title}>
-                      {title}
-                    </span>
-                  </div>
-                  {sizeStr && <span className="asset-size">{sizeStr}</span>}
-                  <div className="asset-actions">
-                    {onPlaceAsset && (
-                      <button
-                        type="button"
-                        className="asset-action-btn asset-place-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onPlaceAsset(block.id)
-                        }}
-                        title="Place on board"
-                        aria-label={`Place ${title} on board`}
-                      >
-                        + Add
-                      </button>
+                <div className="asset-row-wrapper">
+                  {isFirstInCategory && (
+                    <div className="dock-category-divider">
+                      <span className="dock-category-name">{category}</span>
+                      <span className="dock-category-count">
+                        {categoryCounts.get(category) ?? 1}
+                      </span>
+                    </div>
+                  )}
+                  <div
+                    className="asset-row"
+                    data-active={active || undefined}
+                    draggable="true"
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        'application/x-khoja-block-id',
+                        block.id,
+                      )
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                  >
+                    <div className="asset-row-main">
+                      <span className="layer-chip" aria-hidden="true" />
+                      <span className="layer-name" title={title}>
+                        {title}
+                      </span>
+                    </div>
+                    {category && assetSort !== 'category' && (
+                      <span className="asset-category-tag">{category}</span>
                     )}
-                    {onDeleteAsset && (
-                      <button
-                        type="button"
-                        className="asset-action-btn asset-delete-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDeleteAsset(block.id)
-                        }}
-                        title="Delete asset permanently"
-                        aria-label={`Delete ${title} permanently`}
-                      >
-                        &times;
-                      </button>
-                    )}
+                    {sizeStr && <span className="asset-size">{sizeStr}</span>}
+                    <div className="asset-actions">
+                      {onPlaceAsset && (
+                        <button
+                          type="button"
+                          className="asset-action-btn asset-place-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onPlaceAsset(block.id)
+                          }}
+                          title="Place on board (Enter)"
+                          aria-label={`Place ${title} on board`}
+                        >
+                          + Add
+                        </button>
+                      )}
+                      {onDeleteAsset && (
+                        <button
+                          type="button"
+                          className="asset-action-btn asset-delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onDeleteAsset(block.id)
+                          }}
+                          title="Delete asset permanently (Del)"
+                          aria-label={`Delete ${title} permanently`}
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -419,10 +479,17 @@ interface NavListProps<T> {
   activeIndex: number
   onActiveIndexChange: (index: number) => void
   onSelect?: (key: string) => void
+  onDelete?: (key: string) => void
+  onCycleSort?: () => void
   selectedKeys: ReadonlySet<string>
   label: string
   empty: ReactNode
-  renderContent: (item: T, active: boolean, selected: boolean) => ReactNode
+  renderContent: (
+    item: T,
+    active: boolean,
+    selected: boolean,
+    index: number,
+  ) => ReactNode
 }
 
 /** APG listbox with aria-activedescendant: focus stays on the container and
@@ -434,6 +501,8 @@ function NavList<T>({
   activeIndex,
   onActiveIndexChange,
   onSelect,
+  onDelete,
+  onCycleSort,
   selectedKeys,
   label,
   empty,
@@ -452,28 +521,43 @@ function NavList<T>({
   const onKeyDown = (e: ReactKeyboardEvent) => {
     if (items.length === 0) return
     const last = items.length - 1
-    switch (e.key) {
-      case 'ArrowDown':
+    const key = e.key.toLowerCase()
+
+    switch (key) {
+      case 'arrowdown':
         e.preventDefault()
         activate(activeIndex + 1)
         break
-      case 'ArrowUp':
+      case 'arrowup':
         e.preventDefault()
         activate(activeIndex - 1)
         break
-      case 'Home':
+      case 'home':
         e.preventDefault()
         activate(0)
         break
-      case 'End':
+      case 'end':
         e.preventDefault()
         activate(last)
         break
-      case 'Enter':
+      case 'enter':
       case ' ':
         // Space scrolls the page by default; stop it once we're in the list.
         e.preventDefault()
         activate(activeIndex)
+        break
+      case 'delete':
+      case 'backspace':
+        if (onDelete && items[activeIndex]) {
+          e.preventDefault()
+          onDelete(getKey(items[activeIndex]))
+        }
+        break
+      case 's':
+        if (onCycleSort) {
+          e.preventDefault()
+          onCycleSort()
+        }
         break
       default:
         break
@@ -517,7 +601,7 @@ function NavList<T>({
               className={active ? 'is-active' : ''}
               onClick={(e) => onOptionClick(e, index)}
             >
-              {renderContent(item, active, selected)}
+              {renderContent(item, active, selected, index)}
             </li>
           )
         })

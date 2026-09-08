@@ -1873,6 +1873,12 @@ a {
   flex: none;
 }
 
+.dock-sort-hint {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--sea-ink-soft);
+}
+
 .dock-sort-select {
   flex: 1;
   border: 1px solid var(--line);
@@ -1892,6 +1898,40 @@ a {
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 35%, transparent);
 }
 
+.dock-category-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.4rem 0.2rem;
+  margin-top: 0.25rem;
+  border-bottom: 1px dashed color-mix(in oklab, var(--line) 85%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+.dock-category-name {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sea-ink-soft);
+}
+
+.dock-category-count {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.05rem 0.35rem;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--line) 70%, transparent);
+  color: var(--sea-ink);
+}
+
+.asset-row-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 .asset-row {
   display: flex;
   align-items: center;
@@ -1905,6 +1945,16 @@ a {
   gap: 0.45rem;
   min-width: 0;
   flex: 1;
+}
+
+.asset-category-tag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--sea-ink-soft);
+  background: color-mix(in oklab, var(--line) 50%, transparent);
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  flex: none;
 }
 
 .asset-size {
