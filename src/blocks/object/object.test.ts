@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { blockTitle } from '#/components/canvas/BlockRenderer'
 import type { ObservableBlock } from '#/components/canvas/BlockShell'
-import type { SchemaDef } from '#/types'
+import type { ObjectBlockData, SchemaDef } from '#/types'
 import { BlockSchema, TypeSchema } from '#/types/schemas'
 
 describe('Custom Object Type Schema & Block Renderer', () => {
@@ -42,7 +42,7 @@ describe('Custom Object Type Schema & Block Renderer', () => {
 
     const validated = BlockSchema.parse(blockData)
     expect(validated.kind).toBe('user-task-type')
-    expect((validated.data as any).values['legacy-removed-field']).toBe('preserved value')
+    expect((validated.data as ObjectBlockData).values['legacy-removed-field']).toBe('preserved value')
   })
 
   it('resolves blockTitle using title field if present', () => {

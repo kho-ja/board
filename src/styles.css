@@ -1807,3 +1807,46 @@ a {
   font-weight: 700;
   cursor: pointer;
 }
+
+
+/* ---------- Milestone 8: Polish & Uniform UX ---------- */
+
+.status-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--sea-ink-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.status-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--surface-float) 80%, transparent);
+  color: var(--sea-ink);
+  font-size: 0.62rem;
+  font-family: inherit;
+  font-weight: 700;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+@media (max-width: 900px) {
+  .status-hint {
+    display: none;
+  }
+}
+
+.block-shell {
+  transition: box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.block-shell:focus-visible {
+  outline: 2px solid var(--lagoon);
+  outline-offset: 2px;
+}

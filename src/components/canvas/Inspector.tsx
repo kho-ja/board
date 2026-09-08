@@ -69,6 +69,21 @@ export function Inspector({
             </div>
           ))}
         </dl>
+        <div className="inspector-actions">
+          {onUnplace && (
+            <button
+              type="button"
+              className="inspector-btn"
+              onClick={() => {
+                for (const { block } of selected) {
+                  onUnplace(block.id)
+                }
+              }}
+            >
+              Remove {selected.length} from board
+            </button>
+          )}
+        </div>
       </aside>
     )
   }
