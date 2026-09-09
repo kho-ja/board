@@ -159,7 +159,12 @@ export function usePanZoom({
         startScreen: { x: e.clientX, y: e.clientY },
         startViewport: viewportRef.current,
       }
-      container.setPointerCapture(e.pointerId)
+      try {
+        container.setPointerCapture(e.pointerId)
+      } catch {
+        // Capture can fail for non-primary pointers; the gesture still
+        // tracks via bubbled pointermove/pointerup handlers.
+      }
       container.classList.add('is-panning')
     }
 
@@ -173,7 +178,12 @@ export function usePanZoom({
         currentScreen: start,
         moved: false,
       }
-      container.setPointerCapture(e.pointerId)
+      try {
+        container.setPointerCapture(e.pointerId)
+      } catch {
+        // Capture can fail for non-primary pointers; the gesture still
+        // tracks via bubbled pointermove/pointerup handlers.
+      }
       container.classList.add('is-marqueing')
       drawMarquee(start, start)
     }

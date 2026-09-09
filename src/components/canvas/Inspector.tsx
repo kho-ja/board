@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ObjectEditPanel } from '#/blocks/object/ObjectEditPanel'
+import type { AlignMode, DistributeAxis } from '#/lib/canvas/layout'
 import type {
   FieldValue,
   FileGroupBlockData,
@@ -34,6 +35,8 @@ interface InspectorProps {
   ) => void
   onEditSchema?: (schema: SchemaDef) => void
   membersByGroup?: ReadonlyMap<string, ObservableBlock[]>
+  onAlignSelected?: (mode: AlignMode) => void
+  onDistributeSelected?: (axis: DistributeAxis) => void
 }
 
 function round(v: number): string {
@@ -54,6 +57,8 @@ export function Inspector({
   onUpdateObjectValues,
   onEditSchema,
   membersByGroup,
+  onAlignSelected,
+  onDistributeSelected,
 }: InspectorProps) {
   if (selected.length === 0) {
     if (selectedLink) {
@@ -119,6 +124,12 @@ export function Inspector({
           ))}
         </dl>
         <div className="inspector-actions">
+          {(onAlignSelected || onDistributeSelected) && (
+            <AlignPanel
+              onAlign={onAlignSelected}
+              onDistribute={onDistributeSelected}
+            />
+          )}
           {onUnplace && (
             <button
               type="button"
@@ -227,6 +238,63 @@ export function Inspector({
         )}
       </div>
     </aside>
+  )
+}
+
+function AlignPanel({
+  onAlign,
+  onDistribute,
+}: {
+  onAlign?: (mode: AlignMode) => void
+  onDistribute?: (axis: DistributeAxis) => void
+}) {
+  if (!onAlign && !onDistribute) return null
+  const alignButtons: { mode: AlignMode; label: string; title: string }[] = [
+    { mode: 'left', label: 'Left', title: 'Align left edges' },
+    { mode: 'centerH', label: 'Center', title: 'Align horizontal centers' },
+    { mode: 'right', label: 'Right', title: 'Align right edges' },
+    { mode: 'top', label: 'Top', title: 'Align top edges' },
+    { mode: 'middle', label: 'Middle', title: 'Align vertical centers' },
+    { mode: 'bottom', label: 'Bottom', title: 'Align bottom edges' },
+  ]
+  return (
+    <div className="inspector-align">
+      {onAlign && (
+        <div className="inspector-align-row" role="group" aria-label="Align selection">
+          {alignButtons.map(({ mode, label, title }) => (
+            <button
+              key={mode}
+              type="button"
+              className="inspector-btn inspector-align-btn"
+              title={title}
+              onClick={() => onAlign(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {onDistribute && (
+        <div className="inspector-align-row" role="group" aria-label="Distribute selection">
+          <button
+            type="button"
+            className="inspector-btn inspector-align-btn"
+            title="Space out evenly horizontally (needs 3+ blocks)"
+            onClick={() => onDistribute('x')}
+          >
+            Distribute H
+          </button>
+          <button
+            type="button"
+            className="inspector-btn inspector-align-btn"
+            title="Space out evenly vertically (needs 3+ blocks)"
+            onClick={() => onDistribute('y')}
+          >
+            Distribute V
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -1,5 +1,59 @@
 # Changelog
 
+## 2026-09-08 — M12: Spatial Mini-Map & Quick Navigation
+
+- **Mini-map overview** (`src/components/canvas/MiniMap.tsx`): bottom-right corner
+  frame rendering every placed block as a live dot (selected blocks highlighted,
+  same rects as the link layer) plus a lagoon viewport box. Hidden when the
+  board is empty and on narrow screens; `M` toggles it.
+- **Click-to-center & drag-to-pan**: pressing anywhere in the mini-map centers
+  that world point and starts a pan gesture (1:1 pointer tracking) with the
+  frame frozen for the gesture so it never rescales under the cursor.
+- **Stable frame during block drags**: the bounds also freeze while
+  `livePositions` is non-empty, so only the dragged dots travel instead of the
+  whole frame breathing.
+- **Projection math** (`src/lib/canvas/minimap.ts`, unit-tested): content
+  bounds + margin, aspect-fit letterboxing, world/mini conversion, and
+  center-offset navigation.
+
+## 2026-09-08 — M11: Board Serialization & Export / Import
+
+- **JSON export** (`src/lib/board/json.ts`, TopBar): one click downloads the full
+  board state (`blocks`, `placements`, `memberships`, `links`, `types`, `views`)
+  as versioned `kho-ja.board` JSON with a transient StatusBar confirmation.
+- **JSON import** (`JsonImport.tsx` + board route): validated with Zod row schemas
+  plus referential-integrity checks (placements/memberships/links must point at
+  exported blocks) with plain-language errors in the StatusBar. A valid file
+  **replaces** the board through an FK-safe ordered write (wipe children, wipe
+  parents, insert parents, insert children — timestamps refreshed server-side),
+  captured as a single undoable action, so `Ctrl+Z` restores the previous board.
+- **PNG export** (`src/lib/board/png.ts`): renders content bounds at 2x with the
+  2D canvas API — theme-aware cards, plain-text blocks, member rows, and the
+  exact cubic-bezier link curves with port dots. (An SVG-foreignObject version
+  was abandoned: Chromium taints the canvas for any SVG containing
+  foreignObject, and remote `@import`s are stripped for the same reason.)
+- Views are now preloaded and included in export/import.
+
+## 2026-09-08 — M10: Multi-Block Group Drag & Layout Tools + link anchor fix
+
+- **Link anchors track live block size** (`src/routes/index.tsx`): `getBlockRect`
+  previously assumed fixed `sizeForBlock` dimensions, so connection lines missed
+  `max-content`-sized text blocks (e.g. a 36×20 pill vs the assumed 180×92).
+  Rects now come from a `ResizeObserver`-measured size cache (world units,
+  pruned on delete) with a sync DOM read as first-paint fallback.
+- **Relative group drag**: dragging any block inside a multi-selection moves all
+  selected placements by the same world delta in real time (links re-route live)
+  and commits in a single batched `runRecorded` action, so one `Ctrl+Z` reverts
+  the whole move. Pressing a multi-selected block preserves the selection for
+  the drag; a plain click (≤4px) still collapses back to that block.
+- **Alignment & distribution** (`src/lib/canvas/layout.ts` + Inspector): new pure
+  helpers `groupDragTargets` / `alignTargets` / `distributeTargets` (unit-tested
+  in `layout.test.ts`) behind Inspector buttons for multi-selections — Align
+  Left/Center/Right/Top/Middle/Bottom and Distribute H/V (needs 3+ blocks, keeps
+  extremes fixed). Each is one atomic undo step; no-ops record nothing.
+- **Robustness**: `setPointerCapture` calls in `BlockShell`/`usePanZoom` are now
+  guarded — capture failures no longer abort drag/marquee gestures.
+
 ## 2026-09-08 — M9: v1 Relationships ("Link with a Line")
 
 - **PostgreSQL Database Schema & Server Functions for Links**: Added `links` table

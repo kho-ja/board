@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 
 import { BlockShell } from '#/components/canvas/BlockShell'
@@ -11,6 +11,26 @@ import type {
 import type { DropTarget } from '#/components/canvas/BlockShell'
 import { LinksLayer } from '#/components/canvas/LinksLayer'
 import type { PortSide, Rect } from '#/lib/canvas/geometry'
+import { computeBestAnchorPair, createBezierPath } from '#/lib/canvas/geometry'
+import {
+  buildBoardExport,
+  downloadJson,
+  exportFilename,
+  parseBoardExport,
+  type BoardExport,
+} from '#/lib/board/json'
+import { downloadBlob, pngFilename, renderBoardPng } from '#/lib/board/png'
+import type { PngBlockInput, PngLinkCurve } from '#/lib/board/png'
+import { blockTitle } from '#/components/canvas/BlockRenderer'
+import { formatBytes } from '#/blocks/file/FileCard'
+import { MiniMap } from '#/components/canvas/MiniMap'
+import {
+  alignTargets,
+  distributeTargets,
+  type AlignMode,
+  type DistributeAxis,
+  type SizedRect,
+} from '#/lib/canvas/layout'
 import { Canvas } from '#/components/canvas/Canvas'
 import { ViewportProvider, useViewport } from '#/components/canvas/ViewportProvider'
 import { ToolRail } from '#/components/canvas/ToolRail'
@@ -35,11 +55,13 @@ import { SchemaCreator } from '#/components/schema/SchemaCreator'
 import type {
   BlockData,
   FieldValue,
+  FileBlockData,
   FileGroupBlockData,
   ObjectBlockData,
   ObservableLink,
   SchemaDef,
   TextBlockData,
+  ViewDef,
 } from '#/types'
 import type { Collections } from '#/collections'
 
@@ -52,6 +74,7 @@ export const Route = createFileRoute('/')({
       context.collections.membershipsCollection.preload(),
       context.collections.typesCollection.preload(),
       context.collections.linksCollection.preload(),
+      context.collections.viewsCollection.preload(),
     ])
     return null
   },
@@ -71,6 +94,16 @@ const sizeForBlock = (kind: string) => {
   if (kind === 'file-group') return { width: GROUP_WIDTH, height: GROUP_HEIGHT }
   if (kind === 'file' || kind === 'text') return { width: BLOCK_WIDTH, height: BLOCK_HEIGHT }
   return { width: OBJECT_WIDTH, height: OBJECT_HEIGHT }
+}
+
+/** Drop server-managed timestamps so imports get fresh ones on insert. */
+function stripRowDates<T extends { createdAt?: unknown; updatedAt?: unknown }>(
+  row: T,
+): Omit<T, 'createdAt' | 'updatedAt'> {
+  const copy = { ...row }
+  delete copy.createdAt
+  delete copy.updatedAt
+  return copy
 }
 
 const updatePlacement = (
@@ -120,6 +153,10 @@ function BoardPage() {
     query: (q) => q.from({ link: collections.linksCollection }),
   })
 
+  const { data: views } = useLiveQuery({
+    query: (q) => q.from({ view: collections.viewsCollection }),
+  })
+
   const placedIds = useMemo(() => new Set(placements.map((p) => p.blockId)), [placements])
   const unplaced = useMemo(
     () => blocks.filter((block) => !placedIds.has(block.id)),
@@ -135,6 +172,7 @@ function BoardPage() {
         links={links}
         unplaced={unplaced}
         types={types}
+        views={views}
         collections={collections}
       />
     </ViewportProvider>
@@ -148,10 +186,11 @@ interface BoardProps {
   links: ObservableLink[]
   unplaced: ObservableBlock[]
   types: SchemaDef[]
+  views: ViewDef[]
   collections: Collections
 }
 
-function Board({ blocks, placements, memberships, links, unplaced, types, collections }: BoardProps) {
+function Board({ blocks, placements, memberships, links, unplaced, types, views, collections }: BoardProps) {
   const { ref: containerRef, width, height } = useElementSize<HTMLDivElement>()
   const { viewport, setViewport } = useViewport()
   const [tool, setTool] = useState<Tool>('move')
@@ -160,9 +199,66 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
   const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null)
   const [draftLink, setDraftLink] = useState<{ fromBlockId: string; currentPos: Vec } | null>(null)
   const [livePositions, setLivePositions] = useState<Map<string, Vec>>(() => new Map())
+  const [measuredSizes, setMeasuredSizes] = useState<Map<string, { width: number; height: number }>>(
+    () => new Map(),
+  )
   const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types'>('layers')
+  const [miniMapOpen, setMiniMapOpen] = useState(true)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [activeDrop, setActiveDrop] = useState<DropTarget | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const noticeTimerRef = useRef<number | null>(null)
+  const notify = useCallback((message: string) => {
+    setNotice(message)
+    if (noticeTimerRef.current != null) window.clearTimeout(noticeTimerRef.current)
+    noticeTimerRef.current = window.setTimeout(() => {
+      noticeTimerRef.current = null
+      setNotice(null)
+    }, 4000)
+  }, [])
+  useEffect(
+    () => () => {
+      if (noticeTimerRef.current != null) window.clearTimeout(noticeTimerRef.current)
+    },
+    [],
+  )
+  // Track live on-canvas block sizes so link anchors re-route the same commit
+  // a block's content wraps or resizes (text blocks use `width: max-content`).
+  // offsetWidth/offsetHeight are world units (unaffected by canvas zoom).
+  useEffect(() => {
+    const root = containerRef.current
+    if (!root || typeof ResizeObserver === 'undefined') return
+    const apply = (el: HTMLElement) => {
+      const id = el.getAttribute('data-block-id')
+      if (!id) return
+      const w = el.offsetWidth
+      const h = el.offsetHeight
+      if (w <= 0 || h <= 0) return
+      setMeasuredSizes((prev) => {
+        const cur = prev.get(id)
+        if (cur && cur.width === w && cur.height === h) return prev
+        const next = new Map(prev)
+        next.set(id, { width: w, height: h })
+        return next
+      })
+    }
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) apply(entry.target as HTMLElement)
+    })
+    const observeAll = () => {
+      root.querySelectorAll<HTMLElement>('[data-block-id]').forEach((el) => {
+        ro.observe(el)
+        apply(el)
+      })
+    }
+    observeAll()
+    const mo = new MutationObserver(observeAll)
+    mo.observe(root, { childList: true, subtree: true })
+    return () => {
+      mo.disconnect()
+      ro.disconnect()
+    }
+  }, [containerRef])
   const forcePan = tool === 'hand' || spaceHeld
   const { runRecorded, undo, redo } = useUndoRedo()
 
@@ -279,6 +375,22 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
   }, [blocks, placements, visibleRect])
 
   const byId = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks])
+
+  // Prune measured sizes for deleted blocks so the cache doesn't grow.
+  useEffect(() => {
+    setMeasuredSizes((prev) => {
+      if (prev.size === 0) return prev
+      let changed = false
+      const next = new Map(prev)
+      for (const id of prev.keys()) {
+        if (!byId.has(id)) {
+          next.delete(id)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [byId])
 
   const membersByGroup = useMemo(() => {
     const map = new Map<string, ObservableBlock[]>()
@@ -443,13 +555,38 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
 
 
 
-  const handleDragMove = useCallback((blockId: string, pos: Vec) => {
-    setLivePositions((prev) => {
-      const next = new Map(prev)
-      next.set(blockId, pos)
-      return next
-    })
-  }, [])
+  // M10 — relative group drag: when the dragged block belongs to a
+  // multi-selection, every selected placement follows by the same world delta
+  // (computed against committed placements so it never accumulates).
+  const handleDragMove = useCallback(
+    (blockId: string, pos: Vec) => {
+      const base = placements.find((p) => p.blockId === blockId)
+      if (!base) {
+        setLivePositions((prev) => {
+          const next = new Map(prev)
+          next.set(blockId, pos)
+          return next
+        })
+        return
+      }
+      const dx = pos.x - base.positionX
+      const dy = pos.y - base.positionY
+      const group =
+        selectedIds.has(blockId) && selectedIds.size > 1
+          ? Array.from(selectedIds)
+          : [blockId]
+      setLivePositions((prev) => {
+        const next = new Map(prev)
+        for (const id of group) {
+          const b = placements.find((p) => p.blockId === id)
+          if (!b) continue
+          next.set(id, { x: b.positionX + dx, y: b.positionY + dy })
+        }
+        return next
+      })
+    },
+    [placements, selectedIds],
+  )
 
   const getBlockRect = useCallback(
     (blockId: string): Rect | null => {
@@ -461,9 +598,22 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
       const size = sizeForBlock(kind)
       const x = live ? live.x : placement!.positionX
       const y = live ? live.y : placement!.positionY
-      return { x, y, width: size.width, height: size.height }
+      // Prefer the ResizeObserver-measured size (tracks max-content text
+      // blocks as they wrap/resize); fall back to a sync DOM read on first
+      // paint before the observer fires, then to fixed sizes when unmounted.
+      const measured = measuredSizes.get(blockId)
+      let width = measured?.width ?? size.width
+      let height = measured?.height ?? size.height
+      if (!measured && typeof document !== 'undefined') {
+        const el = document.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(blockId)}"]`)
+        if (el && el.offsetWidth > 0 && el.offsetHeight > 0) {
+          width = el.offsetWidth
+          height = el.offsetHeight
+        }
+      }
+      return { x, y, width, height }
     },
-    [byId, livePositions, placements],
+    [byId, livePositions, measuredSizes, placements],
   )
 
   const handleCreateLink = useCallback(
@@ -593,40 +743,25 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
     }
   }, [byId, links, selectedLinkId])
 
+  // M10 — group drag commit: all selected placements move together in a
+  // single batched undo/redo action. Members without a placement (selected
+  // from the dock but never placed) are skipped.
   const handleDragEnd = (blockId: string, position: Vec) => {
+    const group =
+      selectedIds.has(blockId) && selectedIds.size > 1
+        ? Array.from(selectedIds)
+        : [blockId]
     setLivePositions((prev) => {
-      if (!prev.has(blockId)) return prev
+      let changed = false
       const next = new Map(prev)
-      next.delete(blockId)
-      return next
+      for (const id of group) {
+        if (next.delete(id)) changed = true
+      }
+      return changed ? next : prev
     })
 
-    const existing = placements.find((p) => p.blockId === blockId)
-    if (existing) {
-      const prevX = existing.positionX
-      const prevY = existing.positionY
-      runRecorded(
-        'Move block',
-        () => {
-          collections.placementsCollection.update(blockId, (draft) => {
-            draft.positionX = position.x
-            draft.positionY = position.y
-          })
-        },
-        () => {
-          collections.placementsCollection.update(blockId, (draft) => {
-            draft.positionX = prevX
-            draft.positionY = prevY
-          })
-        },
-        () => {
-          collections.placementsCollection.update(blockId, (draft) => {
-            draft.positionX = position.x
-            draft.positionY = position.y
-          })
-        },
-      )
-    } else {
+    const base = placements.find((p) => p.blockId === blockId)
+    if (!base) {
       const placement = {
         blockId,
         positionX: position.x,
@@ -638,7 +773,62 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
         () => void collections.placementsCollection.delete(blockId),
         () => void collections.placementsCollection.insert(placement),
       )
+      return
     }
+
+    const dx = position.x - base.positionX
+    const dy = position.y - base.positionY
+    if (dx === 0 && dy === 0) return
+
+    const moves: {
+      id: string
+      prevX: number
+      prevY: number
+      nextX: number
+      nextY: number
+    }[] = []
+    for (const id of group) {
+      const p = placements.find((pl) => pl.blockId === id)
+      if (!p) continue
+      moves.push({
+        id,
+        prevX: p.positionX,
+        prevY: p.positionY,
+        nextX: Math.round(p.positionX + dx),
+        nextY: Math.round(p.positionY + dy),
+      })
+    }
+    if (moves.length === 0) return
+    if (moves.every((m) => m.prevX === m.nextX && m.prevY === m.nextY)) return
+
+    const label = moves.length === 1 ? 'Move block' : `Move ${moves.length} blocks`
+    runRecorded(
+      label,
+      () => {
+        for (const m of moves) {
+          collections.placementsCollection.update(m.id, (draft) => {
+            draft.positionX = m.nextX
+            draft.positionY = m.nextY
+          })
+        }
+      },
+      () => {
+        for (const m of moves) {
+          collections.placementsCollection.update(m.id, (draft) => {
+            draft.positionX = m.prevX
+            draft.positionY = m.prevY
+          })
+        }
+      },
+      () => {
+        for (const m of moves) {
+          collections.placementsCollection.update(m.id, (draft) => {
+            draft.positionX = m.nextX
+            draft.positionY = m.nextY
+          })
+        }
+      },
+    )
   }
 
   const handleUpdatePosition = (blockId: string, x: number, y: number) => {
@@ -653,6 +843,253 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
       () => void updatePlacement(collections, blockId, x, y),
     )
   }
+
+  // M10 — alignment & distribution for the current multi-selection, each as a
+  // single batched undo/redo action. No-ops (fewer than 2 placed blocks, or
+  // nothing would move) record nothing.
+  const selectedRects = useCallback(() => {
+    const rects: SizedRect[] = []
+    for (const id of selectedIds) {
+      const rect = getBlockRect(id)
+      if (rect) rects.push({ id, ...rect })
+    }
+    return rects
+  }, [getBlockRect, selectedIds])
+
+  const commitMoveTargets = useCallback(
+    (label: string, targets: { id: string; x: number; y: number }[]) => {
+      const moves: { id: string; prevX: number; prevY: number; nextX: number; nextY: number }[] = []
+      for (const t of targets) {
+        const p = placements.find((pl) => pl.blockId === t.id)
+        if (!p) continue
+        if (p.positionX === t.x && p.positionY === t.y) continue
+        moves.push({ id: t.id, prevX: p.positionX, prevY: p.positionY, nextX: t.x, nextY: t.y })
+      }
+      if (moves.length === 0) return
+      runRecorded(
+        label,
+        () => {
+          for (const m of moves) {
+            collections.placementsCollection.update(m.id, (draft) => {
+              draft.positionX = m.nextX
+              draft.positionY = m.nextY
+            })
+          }
+        },
+        () => {
+          for (const m of moves) {
+            collections.placementsCollection.update(m.id, (draft) => {
+              draft.positionX = m.prevX
+              draft.positionY = m.prevY
+            })
+          }
+        },
+        () => {
+          for (const m of moves) {
+            collections.placementsCollection.update(m.id, (draft) => {
+              draft.positionX = m.nextX
+              draft.positionY = m.nextY
+            })
+          }
+        },
+      )
+    },
+    [collections, placements, runRecorded],
+  )
+
+  const handleAlignSelected = useCallback(
+    (mode: AlignMode) => {
+      const rects = selectedRects()
+      if (rects.length < 2) return
+      commitMoveTargets(`Align ${mode}`, alignTargets(rects, mode))
+    },
+    [commitMoveTargets, selectedRects],
+  )
+
+  const handleDistributeSelected = useCallback(
+    (axis: DistributeAxis) => {
+      const rects = selectedRects()
+      if (rects.length < 3) return
+      commitMoveTargets(
+        axis === 'x' ? 'Distribute horizontally' : 'Distribute vertically',
+        distributeTargets(rects, axis),
+      )
+    },
+    [commitMoveTargets, selectedRects],
+  )
+
+  // M11 — full-board export / import / PNG snapshot.
+  //
+  // Import replaces the whole board so a file round-trips the exact state;
+  // the previous board is captured for a one-step undo. The wipe set is read
+  // from a ref at call time (not from the record-time closure) so undo/redo
+  // always remove what is actually on the board when they run.
+  const liveRowsRef = useRef({ blocks, placements, memberships, links, types, views })
+  liveRowsRef.current = { blocks, placements, memberships, links, types, views }
+
+  const replaceAllRows = useCallback(
+    async (rows: BoardExport) => {
+      const c = collections
+      const current = liveRowsRef.current
+      const wipeTxs = [
+        ...current.links.map((l) => c.linksCollection.delete(l.id)),
+        ...current.memberships.map((m) => c.membershipsCollection.delete(m.id)),
+        ...current.placements.map((p) => c.placementsCollection.delete(p.blockId)),
+        ...current.blocks.map((b) => c.blocksCollection.delete(b.id)),
+        ...current.types.map((t) => c.typesCollection.delete(t.id)),
+        ...current.views.map((v) => c.viewsCollection.delete(v.id)),
+      ]
+      await Promise.all(wipeTxs.map((t) => t.isPersisted.promise))
+      // Parents before children: placements/memberships/links carry FKs to blocks.
+      const parentTxs = [
+        ...rows.blocks.map((b) => c.blocksCollection.insert(stripRowDates(b))),
+        ...rows.types.map((t) => c.typesCollection.insert(stripRowDates(t))),
+        ...rows.views.map((v) => c.viewsCollection.insert(stripRowDates(v))),
+      ]
+      await Promise.all(parentTxs.map((t) => t.isPersisted.promise))
+      for (const p of rows.placements) {
+        c.placementsCollection.insert({
+          blockId: p.blockId,
+          positionX: p.positionX,
+          positionY: p.positionY,
+        })
+      }
+      for (const m of rows.memberships) c.membershipsCollection.insert(stripRowDates(m))
+      for (const l of rows.links) c.linksCollection.insert(stripRowDates(l))
+    },
+    [collections],
+  )
+
+  const handleExportJson = useCallback(() => {
+    const payload = buildBoardExport({
+      blocks: [...blocks],
+      placements: [...placements],
+      memberships: [...memberships],
+      links: [...links],
+      types: [...types],
+      views: [...views],
+    })
+    downloadJson(exportFilename(), payload)
+    notify(
+      `Exported ${blocks.length} blocks, ${placements.length} placed, ${links.length} links.`,
+    )
+  }, [blocks, links, memberships, notify, placements, types, views])
+
+  const handleImportBoardFile = useCallback(
+    (file: File) => {
+      void (async () => {
+        let data: BoardExport
+        try {
+          const parsed = parseBoardExport(JSON.parse(await file.text()))
+          if (!parsed.ok) {
+            notify(`Import failed: ${parsed.error}`)
+            return
+          }
+          data = parsed.data
+        } catch {
+          notify('Import failed: that file is not valid board JSON.')
+          return
+        }
+        const prev = liveRowsRef.current
+        const prevSnapshot: BoardExport = {
+          app: 'kho-ja.board',
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          blocks: structuredClone(prev.blocks),
+          placements: structuredClone(prev.placements),
+          memberships: structuredClone(prev.memberships),
+          links: structuredClone(prev.links),
+          types: structuredClone(prev.types),
+          views: structuredClone(prev.views),
+        }
+        runRecorded(
+          `Import board (${data.blocks.length} blocks)`,
+          () => void replaceAllRows(data),
+          () => void replaceAllRows(prevSnapshot),
+          () => void replaceAllRows(data),
+        )
+        setSelectedIds(new Set())
+        setSelectedLinkId(null)
+        notify(`Imported ${data.blocks.length} blocks, ${data.placements.length} placed.`)
+      })()
+    },
+    [notify, replaceAllRows, runRecorded],
+  )
+
+  const handleExportPng = useCallback(() => {
+    void (async () => {
+      const pngBlocks: PngBlockInput[] = []
+      for (const p of placements) {
+        const rect = getBlockRect(p.blockId)
+        const block = byId.get(p.blockId)
+        if (!rect || !block) continue
+        const data = block.data
+        if (block.kind === 'text') {
+          const text = data as TextBlockData
+          pngBlocks.push({ rect, kind: 'text', title: '', body: text.markdown.split('\n') })
+        } else if (block.kind === 'file') {
+          const file = data as FileBlockData
+          pngBlocks.push({
+            rect,
+            kind: 'file',
+            title: file.name,
+            subtitle: `${formatBytes(file.size)}${file.mimeType ? ` · ${file.mimeType}` : ''}`,
+          })
+        } else if (block.kind === 'file-group') {
+          const group = data as FileGroupBlockData
+          const members = membersByGroup.get(block.id) ?? []
+          pngBlocks.push({
+            rect,
+            kind: 'file-group',
+            title: group.name,
+            subtitle: `${members.length} ${members.length === 1 ? 'file' : 'files'}`,
+            body: members.map((m) => blockTitle(m, types)),
+          })
+        } else {
+          const values = (data as ObjectBlockData).values ?? {}
+          pngBlocks.push({
+            rect,
+            kind: block.kind,
+            title: blockTitle(block, types),
+            body: Object.entries(values).map(([k, v]) =>
+              v === null || v === undefined ? `${k}: —` : `${k}: ${String(v)}`,
+            ),
+          })
+        }
+      }
+      if (pngBlocks.length === 0) {
+        notify('Nothing to export: the board is empty.')
+        return
+      }
+      const pngLinks: PngLinkCurve[] = []
+      for (const l of links) {
+        const ra = getBlockRect(l.blockAId)
+        const rb = getBlockRect(l.blockBId)
+        if (!ra || !rb) continue
+        const { start, end } = computeBestAnchorPair(ra, rb)
+        pngLinks.push({
+          d: createBezierPath(start, end),
+          startX: start.x,
+          startY: start.y,
+          endX: end.x,
+          endY: end.y,
+        })
+      }
+      const bounds = {
+        minX: Math.min(...pngBlocks.map((b) => b.rect.x)),
+        minY: Math.min(...pngBlocks.map((b) => b.rect.y)),
+        maxX: Math.max(...pngBlocks.map((b) => b.rect.x + b.rect.width)),
+        maxY: Math.max(...pngBlocks.map((b) => b.rect.y + b.rect.height)),
+      }
+      try {
+        const blob = await renderBoardPng(pngBlocks, pngLinks, bounds)
+        downloadBlob(blob, pngFilename())
+        notify(`Exported PNG (${pngBlocks.length} blocks).`)
+      } catch (e) {
+        notify(`PNG export failed: ${e instanceof Error ? e.message : 'unknown error'}`)
+      }
+    })()
+  }, [byId, getBlockRect, links, membersByGroup, notify, placements, types])
 
   const commitText = (blockId: string, markdown: string) => {
     const block = blocks.find((b) => b.id === blockId)
@@ -950,6 +1387,9 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
           ? screenToWorld(viewport, { x: client.x - rect.left, y: client.y - rect.top })
           : viewCenter()
 
+      // A pointer drag may have left live positions behind for the whole
+      // selection; the drop supersedes them.
+      setLivePositions(new Map())
       runRecorded(
         'Add to group',
         () => {
@@ -1319,6 +1759,8 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
       else if (key === 'c') setTool('link')
       else if (key === 'a') {
         setDockTab((prev) => (prev === 'assets' ? 'layers' : 'assets'))
+      } else if (key === 'm') {
+        setMiniMapOpen((prev) => !prev)
       } else if (key === 'escape') {
         if (draftLink) {
           setDraftLink(null)
@@ -1384,6 +1826,17 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
     [addTextAt, tool],
   )
 
+  // M12 — overview dots share the link layer's live rects, so they track
+  // content (and drags) exactly.
+  const miniItems = useMemo(
+    () =>
+      placements.flatMap((p) => {
+        const rect = getBlockRect(p.blockId)
+        return rect ? [{ id: p.blockId, rect, selected: selectedIds.has(p.blockId) }] : []
+      }),
+    [getBlockRect, placements, selectedIds],
+  )
+
   // Marquee box-selection: a drag on empty canvas with the Move tool selects
   // every block whose placement rect intersects the dragged rectangle. A click
   // (no drag) reports `null`, which clears the selection.
@@ -1422,6 +1875,9 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
         onPickFiles={pickFiles}
         onCreateGroup={() => void createGroup()}
         onCreateType={() => handleOpenSchemaCreator()}
+        onExportJson={handleExportJson}
+        onImportBoardFile={handleImportBoardFile}
+        onExportPng={handleExportPng}
       />
       <div className="board-main">
         <ToolRail tool={tool} onSelect={setTool} />
@@ -1483,10 +1939,13 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
                 onStartConnect={handleStartConnect}
                 onDragMove={handleDragMove}
                 onDragEnd={(position) => handleDragEnd(block.id, position)}
+                onDragCancel={() => setLivePositions(new Map())}
                 onCommitText={commitText}
                 onSelect={selectOnly}
                 onToggleSelect={toggleSelect}
                 selected={selectedIds.has(block.id)}
+                inMultiSelection={selectedIds.size > 1}
+                livePosition={livePositions.get(block.id)}
                 members={membersByGroup.get(block.id)}
                 onGroupViewChange={handleGroupViewChange}
                 onMemberClick={selectOnly}
@@ -1501,6 +1960,14 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
               />
             ))}
           </Canvas>
+          {miniMapOpen && (
+            <MiniMap
+              items={miniItems}
+              containerWidth={width}
+              containerHeight={height}
+              freezeBounds={livePositions.size > 0}
+            />
+          )}
         </div>
         <Inspector
           selected={selectedBlocks}
@@ -1516,12 +1983,16 @@ function Board({ blocks, placements, memberships, links, unplaced, types, collec
           onUpdateObjectValues={handleUpdateObjectValues}
           onEditSchema={handleOpenSchemaCreator}
           membersByGroup={membersByGroup}
+          onAlignSelected={handleAlignSelected}
+          onDistributeSelected={handleDistributeSelected}
         />
       </div>
       <StatusBar
         viewport={viewport}
         placedCount={placements.length}
         blockCount={blocks.length}
+        linksCount={links.length}
+        message={notice}
         onZoomIn={() => zoomAtCenter(1.35)}
         onZoomOut={() => zoomAtCenter(1 / 1.35)}
         onReset={() => {

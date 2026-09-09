@@ -49,10 +49,13 @@ interface BlockShellProps {
   onStartConnect?: (blockId: string, side: PortSide, screenPos: Vec) => void
   onDragMove?: (blockId: string, pos: Vec) => void
   onDragEnd: (position: Vec) => void
+  onDragCancel?: () => void
   onCommitText?: (blockId: string, markdown: string) => void
   onSelect?: (blockId: string) => void
   onToggleSelect?: (blockId: string) => void
   selected?: boolean
+  inMultiSelection?: boolean
+  livePosition?: Vec | null
   members?: ObservableBlock[]
   onGroupViewChange?: (blockId: string, view: 'card' | 'list') => void
   onMemberClick?: (blockId: string) => void
@@ -89,10 +92,13 @@ export function BlockShell({
   onStartConnect,
   onDragMove,
   onDragEnd,
+  onDragCancel,
   onCommitText,
   onSelect,
   onToggleSelect,
   selected = false,
+  inMultiSelection = false,
+  livePosition = null,
   members,
   onGroupViewChange,
   onMemberClick,
@@ -116,6 +122,10 @@ export function BlockShell({
   const dragDepthRef = useRef(0)
   const lastClientRef = useRef<Vec | null>(null)
   const dropTargetRef = useRef<DropTarget | null>(null)
+  // M10 — pressing an already-selected block inside a multi-selection keeps
+  // the selection for a potential group drag; a plain click (no real move)
+  // collapses back to that single block on pointer-up instead.
+  const deferredCollapseRef = useRef(false)
 
   scaleRef.current = viewport.scale
 
@@ -150,9 +160,20 @@ export function BlockShell({
       return
     }
 
-    onSelect?.(block.id)
+    if (selected && inMultiSelection) {
+      // Part of an active multi-selection: preserve it so the gesture can
+      // become a group drag. A click without movement collapses on release.
+      deferredCollapseRef.current = true
+    } else {
+      onSelect?.(block.id)
+    }
     e.stopPropagation()
-    e.currentTarget.setPointerCapture(e.pointerId)
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // Pointer capture can fail for non-primary or synthetic pointers; the
+      // drag still tracks via bubbled pointermove/pointerup handlers.
+    }
 
     dragRef.current = {
       pointerId: e.pointerId,
@@ -228,6 +249,15 @@ export function BlockShell({
     dropTargetRef.current = null
     onDropTargetChange?.(null)
 
+    // Plain click on a multi-selected block collapses the selection to it.
+    const deferredCollapse = deferredCollapseRef.current
+    deferredCollapseRef.current = false
+    const movedPx = Math.hypot(
+      e.clientX - drag.startScreen.x,
+      e.clientY - drag.startScreen.y,
+    )
+    const COLLAPSE_TOLERANCE_PX = 4
+
     if (commit) {
       if (target?.type === 'group' && onDropBlockOnGroup && lastClientRef.current) {
         onDropBlockOnGroup(target.groupId, block.id, lastClientRef.current)
@@ -236,8 +266,12 @@ export function BlockShell({
         applyPosition(finalPos)
         onDragEnd(finalPos)
       }
+      if (deferredCollapse && movedPx <= COLLAPSE_TOLERANCE_PX) {
+        onSelect?.(block.id)
+      }
     } else {
       applyPosition({ x: placement.positionX, y: placement.positionY })
+      onDragCancel?.()
     }
   }
 
@@ -322,7 +356,7 @@ export function BlockShell({
     <div
       ref={elRef}
       className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}${isConnectSource ? ' is-connecting-source' : ''}${isConnectTarget ? ' is-connect-target' : ''}`}
-      style={{ left: placement.positionX, top: placement.positionY }}
+      style={{ left: livePosition?.x ?? placement.positionX, top: livePosition?.y ?? placement.positionY }}
       data-block-id={block.id}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

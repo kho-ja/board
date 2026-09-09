@@ -72,22 +72,33 @@ things are done before they are done.
   port handles on blocks, Connector Tool (`C` hotkey) with live animated draft preview,
   real-time line re-routing during drag, link selection/inspection, cascade deletion, and
   full undo/redo integration.
+- **Link anchors track live block size:** `getBlockRect` no longer assumes fixed block
+  dimensions — a `ResizeObserver` size cache keeps connection ports glued to
+  `max-content` text blocks and every other kind.
+- **M10 — Multi-Block Group Drag & Layout Tools:** dragging a block inside a
+  multi-selection moves all selected placements together (single undo step);
+  Inspector align (Left/Center/Right/Top/Middle/Bottom) and distribute (H/V)
+  actions, each atomic in the undo stack. Verified: marquee-select 3 → drag one
+  → all move with offsets → `Ctrl+Z` reverts all 3.
+- **M11 — Board Serialization & Export / Import:** one-click versioned JSON
+  export of the full board; validated import that replaces the board in one
+  undoable action (wipe → restore, FK-ordered); 2x PNG snapshot of the content
+  bounds with cards, text, and link curves. Verified: export → modify → import
+  → exact state restored → undo/redo round-trip; malformed files rejected with
+  the board untouched.
+- **M12 — Spatial Mini-Map & Quick Navigation:** corner overview with live
+  block dots and a viewport box; click/drag pans the board, `M` toggles.
+  Verified: click centers, drag pans 1:1, dots track drags with a frozen frame.
 
 ## In progress
 
-- None (Milestone 9 completed).
+- None (Milestone 12 completed).
 
 ## Next (in rough order)
 
-1. **M10 — Multi-Block Group Drag & Layout Tools:**
-   - Moving any block in a multi-selection shifts all selected placements together.
-   - Selection alignment tools (Align Left/Right/Top/Bottom, Distribute).
-2. **M11 — Board Serialization & Export / Import:**
-   - Full board JSON export and import (blocks, placements, memberships, types, links).
-   - Canvas snapshot PNG export.
-3. **M12 — Spatial Mini-Map & Quick Navigation:**
-   - Corner overview mini-map showing all placed blocks on the infinite canvas.
-   - Click/drag mini-map viewport box to navigate quickly.
+- **Typed connections** (`depends-on`, `responsible-for`, …) remain the
+  consciously deferred power feature (see DECISIONS.md); otherwise v1 canvas
+  scope from START_PLAN is complete.
 
 > **Typed connections** (`depends-on`, `responsible-for`, `part-of`, `related-to`)
 > are consciously **deferred out of v1** — they become an optional power feature
