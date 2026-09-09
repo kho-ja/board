@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 
 import { ObjectEditPanel } from '#/blocks/object/ObjectEditPanel'
 import type { AlignMode, DistributeAxis } from '#/lib/canvas/layout'
+import {
+  CONNECTION_TYPE_COLORS,
+  CONNECTION_TYPE_LABELS,
+  CONNECTION_TYPES,
+} from '#/lib/board/connections'
 import type {
+  ConnectionType,
   FieldValue,
   FileGroupBlockData,
   ObjectBlockData,
@@ -22,6 +28,8 @@ interface InspectorProps {
   selected: { block: ObservableBlock; placement: ObservablePlacement | null }[]
   selectedLink?: SelectedLinkInfo | null
   onDeleteLink?: (linkId: string) => void
+  onUpdateLinkType?: (linkId: string, type: ConnectionType) => void
+  onUpdateLinkLabel?: (linkId: string, label: string) => void
   types?: readonly SchemaDef[]
   onUpdatePosition: (blockId: string, x: number, y: number) => void
   onUnplace?: (blockId: string) => void
@@ -47,6 +55,8 @@ export function Inspector({
   selected,
   selectedLink,
   onDeleteLink,
+  onUpdateLinkType,
+  onUpdateLinkLabel,
   types,
   onUpdatePosition,
   onUnplace,
@@ -68,7 +78,7 @@ export function Inspector({
         <aside className="inspector">
           <div className="inspector-head">
             <span className="inspector-kind">Relationship</span>
-            <h2 className="inspector-title">Connection Line</h2>
+            <h2 className="inspector-title">Connection</h2>
           </div>
           <dl className="inspector-meta">
             <div>
@@ -80,6 +90,20 @@ export function Inspector({
               <dd>{titleB}</dd>
             </div>
           </dl>
+          {onUpdateLinkType && (
+            <ConnectionTypeField
+              linkId={selectedLink.link.id}
+              type={selectedLink.link.type ?? 'related-to'}
+              onUpdate={onUpdateLinkType}
+            />
+          )}
+          {onUpdateLinkLabel && (
+            <ConnectionLabelField
+              linkId={selectedLink.link.id}
+              label={selectedLink.link.label ?? ''}
+              onUpdate={onUpdateLinkLabel}
+            />
+          )}
           <div className="inspector-actions">
             {onDeleteLink && (
               <button
@@ -238,6 +262,90 @@ export function Inspector({
         )}
       </div>
     </aside>
+  )
+}
+
+function ConnectionTypeField({
+  linkId,
+  type,
+  onUpdate,
+}: {
+  linkId: string
+  type: ConnectionType
+  onUpdate: (linkId: string, type: ConnectionType) => void
+}) {
+  return (
+    <div className="inspector-field">
+      <label className="inspector-label" htmlFor={`conn-type-${linkId}`}>
+        Type
+      </label>
+      <select
+        id={`conn-type-${linkId}`}
+        className="inspector-input"
+        value={type}
+        onChange={(e) => onUpdate(linkId, e.target.value as ConnectionType)}
+      >
+        {CONNECTION_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {CONNECTION_TYPE_LABELS[t]}
+          </option>
+        ))}
+      </select>
+      <p className="inspector-hint">
+        <span
+          className="conn-type-dot"
+          style={{ background: CONNECTION_TYPE_COLORS[type] }}
+          aria-hidden="true"
+        />
+        {CONNECTION_TYPES.map((t) => CONNECTION_TYPE_LABELS[t]).join(' · ')}
+      </p>
+    </div>
+  )
+}
+
+function ConnectionLabelField({
+  linkId,
+  label,
+  onUpdate,
+}: {
+  linkId: string
+  label: string
+  onUpdate: (linkId: string, label: string) => void
+}) {
+  const [value, setValue] = useState(label)
+
+  useEffect(() => {
+    setValue(label)
+  }, [label])
+
+  const commit = () => {
+    if (value.trim() !== label) {
+      onUpdate(linkId, value.trim())
+    } else {
+      setValue(label)
+    }
+  }
+
+  return (
+    <div className="inspector-field">
+      <label className="inspector-label" htmlFor={`conn-label-${linkId}`}>
+        Label
+      </label>
+      <input
+        id={`conn-label-${linkId}`}
+        className="inspector-input"
+        placeholder="Optional note on the connection"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            commit()
+            e.currentTarget.blur()
+          }
+        }}
+      />
+    </div>
   )
 }
 

@@ -1,5 +1,43 @@
 # Changelog
 
+## 2026-09-09 — M13: Typed Connections & Edge Labels
+
+- **Typed connection set** (`src/lib/board/connections.ts`, unit-tested):
+  `depends-on`, `responsible-for`, `part-of`, `related-to`. `related-to` is the
+  only symmetric type and the generic fallback; the drawn arrow on the other
+  three expresses the canonical meaning, so reversing a drag reverses the fact.
+  Per DECISIONS.md, the set stays deliberately small.
+- **Connection-type picker** (ToolRail, appears only while the Connector tool
+  is active): four color-coded chips, `related-to` by default. The live draft
+  line previews the chosen type — color + arrowhead, or a plain undirected
+  curve for `related-to`.
+- **Semantic dedupe**: a second drag between the same pair is a no-op unless
+  either the type or (for directed types) the direction differs, so the board
+  carries multiple typed edges per pair — many-to-many with distinct meaning.
+- **Edge labels**: optional free-text note on a connection, edited in the
+  Inspector label field, rendered centered on the curve with a paint-order halo.
+- **Inspector rework for connections**: title "Connection", connected-from/to
+  names, a Type select (`ConnectionTypeField`) and a Label field
+  (`ConnectionLabelField`). Type and label updates are recorded into the same
+  undo/redo stack as the rest of the board.
+- **Data layer**: `links.type` (not-null, default `related-to`) and nullable
+  `links.label`; the old unique per-pair index is gone; `linksCollection`
+  gained the missing `onUpdate` via the new `updateLink` server fn
+  (`updateLinkFn`), matching every other collection.
+- **Rendering** (`src/components/canvas/LinksLayer.tsx`): per-type stroke color
+  `var(--conn-*)`, SVG `marker` arrowheads per directed type
+  (`#conn-arrow-<type>`), invisible wide hit path, selection halo, and midpoint
+  type/label text.
+- **Export / import** (`src/lib/board/json.ts`): board JSON is now **v2**
+  (imports accept v1 and upgrade in place, backfilling `related-to`); typed
+  links including labels round-trip. PNG export strokes per-type colors plus
+  arrowheads and port dots.
+- **Fix — stale relational metadata**: `listLinks` now uses the direct
+  `select()` instead of `db.query.links.findMany()`, whose first-import column
+  cache silently dropped the new `type`/`label` columns (same class of bug as
+  `bc8e313`). Verified live: typed drags, dedupe, Inspector type/label,
+  undo/redo round-trip, and persistence in Postgres.
+
 ## 2026-09-08 — M12: Spatial Mini-Map & Quick Navigation
 
 - **Mini-map overview** (`src/components/canvas/MiniMap.tsx`): bottom-right corner

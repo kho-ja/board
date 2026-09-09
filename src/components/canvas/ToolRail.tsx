@@ -1,9 +1,18 @@
+import {
+  CONNECTION_TYPE_COLORS,
+  CONNECTION_TYPE_LABELS,
+  CONNECTION_TYPES,
+} from '#/lib/board/connections'
+import type { ConnectionType } from '#/types'
 import { TOOLS } from './tools'
 import type { Tool } from './tools'
 
 interface ToolRailProps {
   tool: Tool
   onSelect: (tool: Tool) => void
+  /** M13 — connection type scrubber while the Connector tool is active. */
+  connectionType?: ConnectionType
+  onConnectionTypeChange?: (type: ConnectionType) => void
 }
 
 function ToolIcon({ tool }: { tool: Tool }) {
@@ -53,7 +62,7 @@ function ToolIcon({ tool }: { tool: Tool }) {
   }
 }
 
-export function ToolRail({ tool, onSelect }: ToolRailProps) {
+export function ToolRail({ tool, onSelect, connectionType, onConnectionTypeChange }: ToolRailProps) {
   return (
     <nav className="tool-rail" aria-label="Tools">
       {TOOLS.map(({ id, label, shortcut }) => (
@@ -72,6 +81,28 @@ export function ToolRail({ tool, onSelect }: ToolRailProps) {
           </span>
         </button>
       ))}
+
+      {tool === 'link' && connectionType && onConnectionTypeChange && (
+        <div className="conn-type-picker" role="group" aria-label="Connection type">
+          {CONNECTION_TYPES.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className={`conn-type-chip${connectionType === type ? ' is-active' : ''}`}
+              onClick={() => onConnectionTypeChange(type)}
+              title={`Connect as ${CONNECTION_TYPE_LABELS[type]}`}
+              aria-pressed={connectionType === type}
+            >
+              <span
+                className="conn-type-dot"
+                style={{ background: CONNECTION_TYPE_COLORS[type] }}
+                aria-hidden="true"
+              />
+              {CONNECTION_TYPE_LABELS[type]}
+            </button>
+          ))}
+        </div>
+      )}
     </nav>
   )
 }

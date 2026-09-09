@@ -3,9 +3,10 @@ import { createServerFn } from '@tanstack/react-start'
 import type {
   BlockInsert,
   BlockRow,
+  LinkInsert,
+  LinkRow,
   MembershipInsert,
   MembershipRow,
-  LinkInsert,
   PlacementInsert,
   PlacementRow,
   TypeInsert,
@@ -34,6 +35,7 @@ import {
   listTypes,
   listViews,
   updateBlock,
+  updateLink,
   updateMembership,
   updatePlacement,
   updateType,
@@ -169,6 +171,12 @@ export const insertLinkFn = createServerFn({ method: 'POST' })
   .validator((input: LinkInsert) => input)
   .handler(async ({ data }) => {
     return await insertLink(data)
+  })
+
+export const updateLinkFn = createServerFn({ method: 'POST' })
+  .validator((input: { id: string; changes: Partial<LinkRow> }) => input)
+  .handler(async ({ data }) => {
+    return await updateLink(data.id, data.changes)
   })
 
 export const deleteLinkFn = createServerFn({ method: 'POST' })

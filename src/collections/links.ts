@@ -6,6 +6,7 @@ import {
   deleteLinkFn,
   insertLinkFn,
   listLinksFn,
+  updateLinkFn,
 } from '#/db/queries.functions'
 import { LinkSchema } from '#/types/schemas'
 
@@ -21,6 +22,13 @@ export function createLinksCollection(queryClient: QueryClient) {
       onInsert: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
           await insertLinkFn({ data: mutation.modified })
+        }
+      },
+      onUpdate: async ({ transaction }) => {
+        for (const mutation of transaction.mutations) {
+          await updateLinkFn({
+            data: { id: mutation.key, changes: mutation.changes },
+          })
         }
       },
       onDelete: async ({ transaction }) => {

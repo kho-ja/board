@@ -23,6 +23,12 @@ import { downloadBlob, pngFilename, renderBoardPng } from '#/lib/board/png'
 import type { PngBlockInput, PngLinkCurve } from '#/lib/board/png'
 import { blockTitle } from '#/components/canvas/BlockRenderer'
 import { formatBytes } from '#/blocks/file/FileCard'
+import {
+  DEFAULT_CONNECTION_TYPE,
+  connectionExists,
+  resolveType,
+} from '#/lib/board/connections'
+import type { ConnectionType } from '#/types'
 import { MiniMap } from '#/components/canvas/MiniMap'
 import {
   alignTargets,
@@ -198,6 +204,9 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
   const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null)
   const [draftLink, setDraftLink] = useState<{ fromBlockId: string; currentPos: Vec } | null>(null)
+  // M13 — connection type chosen in the picker while the Connector tool is
+  // active; default (and symmetric fallback) is `related-to`.
+  const [pendingLinkType, setPendingLinkType] = useState<ConnectionType>(DEFAULT_CONNECTION_TYPE)
   const [livePositions, setLivePositions] = useState<Map<string, Vec>>(() => new Map())
   const [measuredSizes, setMeasuredSizes] = useState<Map<string, { width: number; height: number }>>(
     () => new Map(),
@@ -617,25 +626,25 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
   )
 
   const handleCreateLink = useCallback(
-    (blockAId: string, blockBId: string) => {
+    (blockAId: string, blockBId: string, type: ConnectionType = pendingLinkType) => {
       if (blockAId === blockBId) return
-      const exists = links.some(
-        (l) =>
-          (l.blockAId === blockAId && l.blockBId === blockBId) ||
-          (l.blockAId === blockBId && l.blockBId === blockAId),
-      )
-      if (exists) return
+      // Typed connections (M13): dedupe by semantic identity — `related-to`
+      // matches regardless of draw order, directed types keep orientation,
+      // and multiple distinct types between a pair are always allowed.
+      if (connectionExists(links, blockAId, blockBId, type)) return
 
       const id = crypto.randomUUID()
       const link: ObservableLink = {
         id,
         blockAId,
         blockBId,
+        type,
+        label: null,
         createdAt: new Date(),
       }
 
       runRecorded(
-        'Connect blocks',
+        `Connect blocks (${type})`,
         () => {
           collections.linksCollection.insert(link)
         },
@@ -649,7 +658,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
       setSelectedLinkId(id)
       setSelectedIds(new Set())
     },
-    [collections, links, runRecorded],
+    [collections, links, pendingLinkType, runRecorded],
   )
 
   const handleDeleteLink = useCallback(
@@ -669,6 +678,46 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
         },
       )
       setSelectedLinkId((prev) => (prev === linkId ? null : prev))
+    },
+    [collections, links, runRecorded],
+  )
+
+  const handleUpdateLinkType = useCallback(
+    (linkId: string, type: ConnectionType) => {
+      const target = links.find((l) => l.id === linkId)
+      if (!target || target.type === type) return
+      const prev = resolveType(target)
+      const set = (next: ConnectionType) => {
+        collections.linksCollection.update(linkId, (draft) => {
+          draft.type = next
+        })
+      }
+      runRecorded(
+        `Change connection type to ${type}`,
+        () => set(type),
+        () => set(prev),
+        () => set(type),
+      )
+    },
+    [collections, links, runRecorded],
+  )
+
+  const handleUpdateLinkLabel = useCallback(
+    (linkId: string, label: string) => {
+      const target = links.find((l) => l.id === linkId)
+      if (!target || (target.label ?? '') === label) return
+      const prev = target.label ?? null
+      const set = (next: string | null) => {
+        collections.linksCollection.update(linkId, (draft) => {
+          draft.label = next
+        })
+      }
+      runRecorded(
+        'Edit connection label',
+        () => set(label),
+        () => set(prev),
+        () => set(label),
+      )
     },
     [collections, links, runRecorded],
   )
@@ -1073,6 +1122,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           startY: start.y,
           endX: end.x,
           endY: end.y,
+          type: resolveType(l),
         })
       }
       const bounds = {
@@ -1880,7 +1930,12 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
         onExportPng={handleExportPng}
       />
       <div className="board-main">
-        <ToolRail tool={tool} onSelect={setTool} />
+        <ToolRail
+          tool={tool}
+          onSelect={setTool}
+          connectionType={pendingLinkType}
+          onConnectionTypeChange={setPendingLinkType}
+        />
         <LeftDock
           placed={placements.map((placement) => ({
             placement,
@@ -1921,6 +1976,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
               hoveredLinkId={hoveredLinkId}
               onSelectLink={onSelectLink}
               onHoverLink={setHoveredLinkId}
+              pendingLinkType={pendingLinkType}
               draftLink={draftLink}
             />
             {placedBlocks.map(({ placement, block }) => (
@@ -1973,6 +2029,8 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           selected={selectedBlocks}
           selectedLink={selectedLink}
           onDeleteLink={handleDeleteLink}
+          onUpdateLinkType={handleUpdateLinkType}
+          onUpdateLinkLabel={handleUpdateLinkLabel}
           types={types}
           onUpdatePosition={handleUpdatePosition}
           onUnplace={handleUnplace}
