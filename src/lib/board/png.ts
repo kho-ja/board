@@ -8,6 +8,14 @@
  * makes toBlob throw — canvas drawing stays clean.
  */
 
+import {
+  CONNECTION_TYPE_COLORS,
+  DEFAULT_CONNECTION_TYPE,
+  isDirected,
+  resolveType,
+} from './connections'
+import type { ConnectionType } from '#/types'
+
 export interface BoardPngBounds {
   minX: number
   minY: number
@@ -37,6 +45,8 @@ export interface PngLinkCurve {
   startY: number
   endX: number
   endY: number
+  /** M13 typed connection — drives the arrowhead and stroke color. */
+  type?: ConnectionType
 }
 
 const PNG_PAD_PX = 64
@@ -53,6 +63,7 @@ interface Palette {
   lagoon: string
   lagoonDeep: string
   chip: string
+  connections: Record<string, string>
 }
 
 function readPalette(): Palette {
@@ -60,6 +71,10 @@ function readPalette(): Palette {
   const v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport')
   const background = viewport ? getComputedStyle(viewport).backgroundColor : ''
+  const connections: Record<string, string> = {}
+  for (const [type, varName] of Object.entries(CONNECTION_TYPE_COLORS)) {
+    connections[type] = v(varName, type === DEFAULT_CONNECTION_TYPE ? '#4fb8b2' : '#416166')
+  }
   return {
     background: background && background !== 'rgba(0, 0, 0, 0)' ? background : '#ffffff',
     card: v('--surface-strong', 'rgba(255, 255, 255, 0.92)'),
@@ -69,6 +84,7 @@ function readPalette(): Palette {
     lagoon: v('--lagoon', '#4fb8b2'),
     lagoonDeep: v('--lagoon-deep', '#328f97'),
     chip: v('--chip-bg', 'rgba(255, 255, 255, 0.8)'),
+    connections,
   }
 }
 
@@ -307,11 +323,40 @@ export async function renderBoardPng(
 
   ctx.lineCap = 'round'
   for (const link of links) {
+    const type = resolveType({ type: link.type })
+    const color = pal.connections[type] ?? pal.soft
+    ctx.strokeStyle = color
+    ctx.fillStyle = color
+
     ctx.beginPath()
-    ctx.strokeStyle = pal.soft
     ctx.lineWidth = 1.8
     ctx.stroke(new Path2D(link.d))
-    ctx.fillStyle = pal.soft
+
+    // Directed types get an arrowhead at the tip.
+    if (isDirected(type)) {
+      const dx = link.endX - link.startX
+      const dy = link.endY - link.startY
+      const len = Math.hypot(dx, dy) || 1
+      const ux = dx / len
+      const uy = dy / len
+      const arrowLen = 12
+      const arrowHalf = 5.5
+      const tipX = link.endX - ux * (arrowLen * 0.35)
+      const tipY = link.endY - uy * (arrowLen * 0.35)
+      ctx.beginPath()
+      ctx.moveTo(tipX + ux * arrowLen, tipY + uy * arrowLen)
+      ctx.lineTo(
+        tipX - uy * arrowHalf,
+        tipY + ux * arrowHalf,
+      )
+      ctx.lineTo(
+        tipX + uy * arrowHalf,
+        tipY - ux * arrowHalf,
+      )
+      ctx.closePath()
+      ctx.fill()
+    }
+
     for (const [x, y] of [
       [link.startX, link.startY],
       [link.endX, link.endY],

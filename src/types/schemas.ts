@@ -71,10 +71,19 @@ export const MembershipSchema = z.object({
   createdAt: z.coerce.date().optional(),
 })
 
+export const ConnectionTypeSchema = z.enum([
+  'depends-on',
+  'responsible-for',
+  'part-of',
+  'related-to',
+])
+
 export const LinkSchema = z.object({
   id: z.string(),
   blockAId: z.string(),
   blockBId: z.string(),
+  type: ConnectionTypeSchema.optional(),
+  label: z.string().nullable().optional(),
   createdAt: z.coerce.date().optional(),
 })
 

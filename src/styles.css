@@ -25,6 +25,11 @@
   --hero-a: rgba(79, 184, 178, 0.36);
   --hero-b: rgba(47, 106, 74, 0.2);
   --grid-dot: rgba(23, 58, 64, 0.15);
+  /* M13 typed connections */
+  --conn-depends: #e06552;
+  --conn-responsible: #7d74c8;
+  --conn-part: #c9932e;
+  --conn-related: #4fb8b2;
 }
 
 :root[data-theme="dark"] {
@@ -47,6 +52,11 @@
   --hero-a: rgba(96, 215, 207, 0.18);
   --hero-b: rgba(110, 200, 154, 0.12);
   --grid-dot: rgba(141, 229, 219, 0.16);
+  /* M13 typed connections */
+  --conn-depends: #ff8a75;
+  --conn-responsible: #a99ff0;
+  --conn-part: #e6b95c;
+  --conn-related: #60d7cf;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -70,6 +80,11 @@
     --hero-a: rgba(96, 215, 207, 0.18);
     --hero-b: rgba(110, 200, 154, 0.12);
     --grid-dot: rgba(141, 229, 219, 0.16);
+    /* M13 typed connections */
+    --conn-depends: #ff8a75;
+    --conn-responsible: #a99ff0;
+    --conn-part: #e6b95c;
+    --conn-related: #60d7cf;
   }
 }
 
@@ -344,6 +359,68 @@ a {
 .tool-button.is-active {
   background: color-mix(in oklab, var(--lagoon) 26%, transparent);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 40%, transparent) inset;
+}
+
+/* M13 — connection type picker: popover to the right of the tool rail,
+   visible only while the Connector tool is active. */
+.tool-rail {
+  position: relative;
+  z-index: 30;
+}
+
+.conn-type-picker {
+  position: absolute;
+  top: 0.5rem;
+  left: calc(100% + 0.5rem);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--surface-strong) 92%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 22px rgba(10, 30, 34, 0.16);
+}
+
+.conn-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.55rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sea-ink-soft);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.conn-type-chip:hover {
+  background: color-mix(in oklab, var(--lagoon) 16%, transparent);
+}
+
+.conn-type-chip.is-active {
+  background: color-mix(in oklab, var(--lagoon) 22%, transparent);
+  color: var(--sea-ink);
+}
+
+.conn-type-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+}
+
+/* M13 — typed-connection line label (edge note or type name). */
+.canvas-link-label {
+  font: 600 10px/1.15 var(--font-sans, Manrope, system-ui, sans-serif);
+  letter-spacing: 0.02em;
 }
 
 .tool-letter {

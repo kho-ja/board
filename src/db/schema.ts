@@ -7,7 +7,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
 
-import type { BlockData, FieldDef, ViewOptions } from '#/types'
+import type { BlockData, ConnectionType, FieldDef, ViewOptions } from '#/types'
 
 export const blocks = pgTable('blocks', {
   id: text().primaryKey(),
@@ -48,20 +48,24 @@ export const memberships = pgTable(
   (t) => [uniqueIndex('memberships_unique_pair').on(t.groupId, t.memberId)],
 )
 
-export const links = pgTable(
-  'links',
-  {
-    id: text().primaryKey(),
-    blockAId: text('block_a_id')
-      .notNull()
-      .references(() => blocks.id, { onDelete: 'cascade' }),
-    blockBId: text('block_b_id')
-      .notNull()
-      .references(() => blocks.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-  },
-  (t) => [uniqueIndex('links_unique_pair').on(t.blockAId, t.blockBId)],
-)
+export const links = pgTable('links', {
+  id: text().primaryKey(),
+  blockAId: text('block_a_id')
+    .notNull()
+    .references(() => blocks.id, { onDelete: 'cascade' }),
+  blockBId: text('block_b_id')
+    .notNull()
+    .references(() => blocks.id, { onDelete: 'cascade' }),
+  // Typed connection (M13); the drawn arrow expresses the canonical
+  // direction for every non-symmetric type (see DECISIONS.md).
+  type: text('type')
+    .$type<ConnectionType>()
+    .default('related-to')
+    .notNull(),
+  // Optional minimal edge data (a note on the connection).
+  label: text('label'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
 
 export const types = pgTable('types', {
   id: text().primaryKey(),

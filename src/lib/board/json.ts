@@ -10,7 +10,9 @@ import {
 } from '#/types/schemas'
 
 export const BOARD_EXPORT_APP = 'kho-ja.board' as const
-export const BOARD_EXPORT_VERSION = 1 as const
+export const BOARD_EXPORT_VERSION = 2 as const
+/** v1 exports are accepted and upgraded in place (links gain a type). */
+export const BOARD_EXPORT_MIN_VERSION = 1 as const
 
 /**
  * M11 — full board serialization. Every collection the board reads from is
@@ -18,7 +20,8 @@ export const BOARD_EXPORT_VERSION = 1 as const
  */
 export const BoardExportSchema = z.object({
   app: z.literal(BOARD_EXPORT_APP),
-  version: z.literal(BOARD_EXPORT_VERSION),
+  // Accepts v1 and v2; parseBoardExport upgrades v1 → v2 in memory.
+  version: z.union([z.literal(BOARD_EXPORT_MIN_VERSION), z.literal(BOARD_EXPORT_VERSION)]),
   exportedAt: z.string(),
   blocks: z.array(BlockSchema),
   placements: z.array(PlacementSchema),
@@ -55,7 +58,8 @@ export type ParseResult =
 /**
  * Parse + validate an imported board file. Beyond the row schemas this checks
  * referential integrity (every placement / membership / link points at an
- * exported block) and reports the first problem in plain language.
+ * exported block) and reports the first problem in plain language. v1 boards
+ * are upgraded in memory to v2 (untyped links become `related-to`).
  */
 export function parseBoardExport(json: unknown): ParseResult {
   const parsed = BoardExportSchema.safeParse(json)
@@ -64,7 +68,7 @@ export function parseBoardExport(json: unknown): ParseResult {
     const path = first.path.join('.') || '(root)'
     return { ok: false, error: `${path}: ${first.message}` }
   }
-  const data = parsed.data
+  const data = upgrade(parsed.data)
   const blockIds = new Set(data.blocks.map((b) => b.id))
 
   for (const p of data.placements) {
@@ -86,6 +90,16 @@ export function parseBoardExport(json: unknown): ParseResult {
     }
   }
   return { ok: true, data }
+}
+
+/** v1 exports: untyped links become the symmetric default `related-to`. */
+function upgrade(data: BoardExport): BoardExport {
+  if (data.version >= BOARD_EXPORT_VERSION) return data
+  return {
+    ...data,
+    version: BOARD_EXPORT_VERSION,
+    links: data.links.map((l) => ({ ...l, type: l.type ?? 'related-to' })),
+  }
 }
 
 /** Filename stamp: kho-ja-board-20260908-170500.json */

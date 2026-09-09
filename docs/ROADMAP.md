@@ -89,20 +89,25 @@ things are done before they are done.
 - **M12 — Spatial Mini-Map & Quick Navigation:** corner overview with live
   block dots and a viewport box; click/drag pans the board, `M` toggles.
   Verified: click centers, drag pans 1:1, dots track drags with a frozen frame.
+- **M13 — Typed Connections & Edge Labels:** `related-to` (symmetric, generic
+  fallback), `depends-on`, `responsible-for`, `part-of` (directed — the drawn
+  arrow expresses the meaning). Connector-tool picker for the pending type,
+  per-type colors + arrowheads, semantic dedupe (same pair may carry many
+  typed edges; only a same-type same-direction duplicate is a no-op), optional
+  edge labels, Inspector Type select / Label field with undo/redo, JSON export
+  v2 (+ v1 upgrade), and PNG per-type rendering. Verified live: typed drags,
+  dedupe rules, Inspector edits persisting to Postgres, undo/redo round-trip.
 
 ## In progress
 
-- None (Milestone 12 completed).
+- None (Milestone 13 completed).
 
 ## Next (in rough order)
 
-- **Typed connections** (`depends-on`, `responsible-for`, …) remain the
-  consciously deferred power feature (see DECISIONS.md); otherwise v1 canvas
-  scope from START_PLAN is complete.
-
-> **Typed connections** (`depends-on`, `responsible-for`, `part-of`, `related-to`)
-> are consciously **deferred out of v1** — they become an optional power feature
-> later. The full design is preserved in DECISIONS.md and DESIGN.md §2.
+- **The v1 canvas scope from START_PLAN is complete.** The consciously deferred
+  power features remain — real-time collaboration, search across block content,
+  and AI agents that answer questions about structured board data — along with
+  hardening and the eventual public package (product-first, package-later).
 
 ## Future ideas (do not pretend these exist yet)
 

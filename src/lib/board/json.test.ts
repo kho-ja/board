@@ -24,7 +24,7 @@ const snapshot: BoardSnapshot = {
     { blockId: 'b2', positionX: 100, positionY: 200 },
   ],
   memberships: [],
-  links: [{ id: 'l1', blockAId: 'b1', blockBId: 'b2' }],
+  links: [{ id: 'l1', blockAId: 'b1', blockBId: 'b2', type: 'depends-on', label: 'releases' }],
   types: [],
   views: [],
 }
@@ -49,6 +49,33 @@ describe('board json / import validation', () => {
     const exported = JSON.parse(JSON.stringify(buildBoardExport({ ...snapshot })))
     const result = parseBoardExport(exported)
     expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.version).toBe(BOARD_EXPORT_VERSION)
+      expect(result.data.links[0]).toMatchObject({ type: 'depends-on', label: 'releases' })
+    }
+  })
+
+  it('rejects an unknown connection type', () => {
+    const base = buildBoardExport({ ...snapshot })
+    const bad = {
+      ...base,
+      links: [{ id: 'l', blockAId: 'b1', blockBId: 'b2', type: 'blocks' }],
+    }
+    expect(parseBoardExport(bad).ok).toBe(false)
+  })
+
+  it('upgrades a v1 export to v2 by backfilling the link type', () => {
+    const v1 = {
+      ...JSON.parse(JSON.stringify(buildBoardExport({ ...snapshot }))),
+      version: 1,
+      links: [{ id: 'l1', blockAId: 'b1', blockBId: 'b2' }],
+    }
+    const result = parseBoardExport(v1)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.version).toBe(BOARD_EXPORT_VERSION)
+      expect(result.data.links[0].type).toBe('related-to')
+    }
   })
 
   it('rejects the wrong app or version', () => {

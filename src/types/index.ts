@@ -78,5 +78,16 @@ export interface ObservableLink {
   id: string
   blockAId: string
   blockBId: string
+  /** Typed connection. Rows carry one (DB defaults to `related-to`). */
+  type?: ConnectionType
+  /** Optional minimal edge data (a note on the connection). */
+  label?: string | null
   createdAt?: Date
 }
+
+/**
+ * M13 — the small, fixed connection type set (DECISIONS.md). `related-to` is
+ * the one symmetric type and the generic fallback; every other type is
+ * directional and drawn with an arrow that expresses the canonical meaning.
+ */
+export type ConnectionType = 'depends-on' | 'responsible-for' | 'part-of' | 'related-to'

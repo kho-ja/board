@@ -132,14 +132,19 @@ export async function deleteView(id: string) {
 // ---------- Links ----------
 
 export async function listLinks() {
-  if (db.query?.links?.findMany) {
-    return db.query.links.findMany()
-  }
+  // Direct select, not the relational builder: `db.query.links` caches its
+  // column metadata on first import and silently drops columns added later
+  // (e.g. `type`/`label`), which HMR does not rebuild.
   return db.select().from(links)
 }
 
 export async function insertLink(values: LinkInsert) {
   return db.insert(links).values(values).onConflictDoNothing().returning()
+}
+
+export async function updateLink(id: string, changes: Partial<LinkRow>) {
+  const { id: _ignored, ...rest } = changes
+  return db.update(links).set(rest).where(eq(links.id, id)).returning()
 }
 
 export async function deleteLink(id: string) {
