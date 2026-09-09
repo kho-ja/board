@@ -5,6 +5,7 @@ interface StatusBarProps {
   placedCount: number
   blockCount: number
   linksCount?: number
+  message?: string | null
   onZoomIn: () => void
   onZoomOut: () => void
   onReset: () => void
@@ -15,6 +16,7 @@ export function StatusBar({
   placedCount,
   blockCount,
   linksCount = 0,
+  message = null,
   onZoomIn,
   onZoomOut,
   onReset,
@@ -25,6 +27,11 @@ export function StatusBar({
         {placedCount} placed &middot; {blockCount} total
         {linksCount > 0 && ` \u00b7 ${linksCount} ${linksCount === 1 ? 'link' : 'links'}`}
       </span>
+      {message && (
+        <span className="status-notice" role="status">
+          {message}
+        </span>
+      )}
       <span className="status-hint" aria-hidden="true">
         <kbd>V</kbd> Move &middot; <kbd>H</kbd> Hand &middot; <kbd>T</kbd> Text &middot; <kbd>C</kbd> Connect &middot; <kbd>A</kbd> Assets &middot; <kbd>Space</kbd> Pan &middot; <kbd>Del</kbd> Unplace &middot; <kbd>Ctrl+Z</kbd> Undo
       </span>
