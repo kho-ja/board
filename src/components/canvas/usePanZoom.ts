@@ -200,6 +200,7 @@ export function usePanZoom({
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target instanceof Element ? e.target : null
       const onBlock = !!target?.closest('.block-shell')
+      const onLink = !!target?.closest('.canvas-link-group')
 
       // Middle mouse always pans, from anywhere and over any tool.
       if (e.button === 1) {
@@ -218,6 +219,9 @@ export function usePanZoom({
         onPressRef.current(screenToWorld(viewportRef.current, screenPoint(e)))
         return
       }
+
+      // Click on a connection line: let the SVG link handler own the click.
+      if (onLink) return
 
       // Move tool over a block: BlockShell owns drag/select/toggle.
       if (onBlock) return
