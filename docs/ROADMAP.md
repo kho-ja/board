@@ -97,17 +97,25 @@ things are done before they are done.
   edge labels, Inspector Type select / Label field with undo/redo, JSON export
   v2 (+ v1 upgrade), and PNG per-type rendering. Verified live: typed drags,
   dedupe rules, Inspector edits persisting to Postgres, undo/redo round-trip.
+  (After M13: fixed connection lines being unselectable — the marquee was
+  swallowing link clicks, `a794afa`.)
+- **M14 — Board Search (Ctrl/Cmd+K):** search palette over all block content
+  (titles, text markdown, object field keys/values, file and group names)
+  with substring + multi-word matching, ranked title/prefix-first. Selecting a
+  result pans the board to center the block and selects it; unplaced blocks are
+  discovered and placed at the view center. Verified live: palette toggling,
+  real queries over file/text/group blocks, arrow-key navigation, Enter/Esc.
 
 ## In progress
 
-- None (Milestone 13 completed).
+- None (Milestone 14 completed).
 
 ## Next (in rough order)
 
 - **The v1 canvas scope from START_PLAN is complete.** The consciously deferred
-  power features remain — real-time collaboration, search across block content,
-  and AI agents that answer questions about structured board data — along with
-  hardening and the eventual public package (product-first, package-later).
+  power features remain — real-time collaboration, and AI agents that answer
+  questions about structured board data — along with hardening and the eventual
+  public package (product-first, package-later).
 
 ## Future ideas (do not pretend these exist yet)
 
@@ -115,7 +123,6 @@ things are done before they are done.
   raised, but login is not a v1 requirement.
 - Backend + local PostgreSQL + persistence ("one board = one project").
 - Real-time collaboration (accepted as eventually desirable, "too hard" for now).
-- Indexed / full-text / semantic search across block content.
 - AI agents that answer questions about the project's real structured data and
   generate/connect blocks.
 - A publishable npm package to build a community — extracted only *after* a
