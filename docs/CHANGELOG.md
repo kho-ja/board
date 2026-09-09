@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-09-09 — M14: Board Search (Ctrl/Cmd+K)
+
+- **Command palette** (`src/components/canvas/SearchOverlay.tsx`): `Ctrl+K` /
+  `Cmd+K` opens a search overlay (another press or `Esc` closes) with a
+  keyboard-navigable result list (↑/↓ + Enter, mouse hover/click). The active
+  result is highlighted and auto-scrolled into view.
+- **Search index** (`src/lib/board/search.ts`, unit-tested): every block is
+  indexed by its title plus block-kind and — per shape — text markdown, file
+  name, group name, or all object field keys/values (numbers and date strings
+  included). Queries are lowercase substring matches; multi-word queries AND the
+  words together. Ranking: title prefix > term prefix > title substring > term
+  substring, ties alphabetical, capped at 12 results.
+- **Jump to result**: selecting a result pans the viewport so the block is
+  centered at the current zoom and selects it (Inspector shows it). Unplaced
+  blocks are discoverable too — selecting one places it at the view center in
+  one undoable action. Results show a "not placed" badge and a kind caption
+  (Text / File / Group / schema name). Matched text is bolded in the title.
+- **Shortcut wiring**: `Ctrl/Cmd+K` is handled in the same window keydown
+  handler as undo/redo, so it stays out of the way while typing in inputs;
+  the overlay's input handles its own keys so board shortcuts don't fire while
+  the palette is focused.
+
+## 2026-09-09 — Fixed after M13: connection lines could not be selected
+
+- The marquee (`usePanZoom`) started for any press not on a `.block-shell`,
+  capturing the pointer and swallowing the `click` on link hit paths — so a
+  connection could never be selected and its Delete action was unreachable.
+  Added an `onLink` bail-out (`.canvas-link-group`) before the marquee starts.
+  Verified live: click a line → Inspector "Connection" → Del/Backspace or
+  "Delete connection" → Ctrl+Z restores. (`a794afa`)
+
 ## 2026-09-09 — M13: Typed Connections & Edge Labels
 
 - **Typed connection set** (`src/lib/board/connections.ts`, unit-tested):

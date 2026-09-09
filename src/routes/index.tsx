@@ -44,6 +44,7 @@ import type { Tool } from '#/components/canvas/tools'
 import { makeFileBlock } from '#/blocks/file/makeFileBlock'
 import { LeftDock } from '#/components/canvas/LeftDock'
 import { Inspector } from '#/components/canvas/Inspector'
+import { SearchOverlay } from '#/components/canvas/SearchOverlay'
 import { StatusBar } from '#/components/canvas/StatusBar'
 import { TopBar } from '#/components/canvas/TopBar'
 import { useElementSize } from '#/hooks/useElementSize'
@@ -212,6 +213,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
     () => new Map(),
   )
   const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types'>('layers')
+  const [searchOpen, setSearchOpen] = useState(false)
   const [miniMapOpen, setMiniMapOpen] = useState(true)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [activeDrop, setActiveDrop] = useState<DropTarget | null>(null)
@@ -384,6 +386,10 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
   }, [blocks, placements, visibleRect])
 
   const byId = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks])
+  const unplacedBlockIds = useMemo(
+    () => new Set(unplaced.map((b) => b.id)),
+    [unplaced],
+  )
 
   // Prune measured sizes for deleted blocks so the cache doesn't grow.
   useEffect(() => {
@@ -1233,6 +1239,36 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
     [placeBlockAt, viewCenter],
   )
 
+  // M14 — jump to a search result: pan the viewport so the block is centered
+  // (kept at the current zoom), select it, and clear the palette. Unplaced
+  // blocks are placed at the view center first.
+  const focusBlock = useCallback(
+    (blockId: string) => {
+      setSearchOpen(false)
+      const block = byId.get(blockId)
+      if (!block) return
+      const placement = placements.find((p) => p.blockId === blockId)
+      if (!placement) {
+        void placeBlockAt(blockId, viewCenter())
+        return
+      }
+      if (width > 0 && height > 0) {
+        const size = sizeForBlock(block.kind)
+        const cx = placement.positionX + size.width / 2
+        const cy = placement.positionY + size.height / 2
+        setViewport({
+          scale: viewport.scale,
+          offset: {
+            x: width / 2 - cx * viewport.scale,
+            y: height / 2 - cy * viewport.scale,
+          },
+        })
+      }
+      selectOnly(blockId)
+    },
+    [byId, placeBlockAt, placements, selectOnly, setViewport, viewCenter, viewport.scale, width, height],
+  )
+
   // Cascade-import dropped/picked files as `file` blocks (metadata only), each
   // auto-placed on a GRID_SPACING grid anchored at `anchor`. Anchor for drops
   // is the drop point; for the picker button it is the m2 (80, 80) screen point.
@@ -1791,6 +1827,11 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           redo()
           return
         }
+        if (key === 'k') {
+          event.preventDefault()
+          setSearchOpen((prev) => !prev)
+          return
+        }
         if (event.altKey) return
       } else if (event.altKey) {
         return
@@ -2063,6 +2104,14 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
         schema={schemaToEdit}
         onClose={handleCloseSchemaCreator}
         onSave={handleSaveSchema}
+      />
+      <SearchOverlay
+        open={searchOpen}
+        blocks={blocks}
+        types={types}
+        unplacedBlockIds={unplacedBlockIds}
+        onClose={() => setSearchOpen(false)}
+        onSelect={focusBlock}
       />
     </div>
   )
