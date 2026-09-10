@@ -44,6 +44,7 @@ import type { Tool } from '#/components/canvas/tools'
 import { makeFileBlock } from '#/blocks/file/makeFileBlock'
 import { LeftDock } from '#/components/canvas/LeftDock'
 import { Inspector } from '#/components/canvas/Inspector'
+import { AskPanel } from '#/components/canvas/AskPanel'
 import { SearchOverlay } from '#/components/canvas/SearchOverlay'
 import { StatusBar } from '#/components/canvas/StatusBar'
 import { TopBar } from '#/components/canvas/TopBar'
@@ -212,7 +213,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
   const [measuredSizes, setMeasuredSizes] = useState<Map<string, { width: number; height: number }>>(
     () => new Map(),
   )
-  const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types'>('layers')
+  const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types' | 'ask'>('layers')
   const [searchOpen, setSearchOpen] = useState(false)
   const [miniMapOpen, setMiniMapOpen] = useState(true)
   const [spaceHeld, setSpaceHeld] = useState(false)
@@ -1997,6 +1998,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           onOpenSchemaCreator={handleOpenSchemaCreator}
           onCreateInstance={handleCreateInstance}
           onDeleteType={handleDeleteType}
+          askPanel={<AskPanel />}
         />
         <div className="canvas-area">
           <Canvas

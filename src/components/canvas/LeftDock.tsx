@@ -11,7 +11,7 @@ import { FileImport } from './FileImport'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
-export type Tab = 'layers' | 'assets' | 'types'
+export type Tab = 'layers' | 'assets' | 'types' | 'ask'
 
 export type AssetSort =
   | 'category'
@@ -51,6 +51,7 @@ interface LeftDockProps {
   onOpenSchemaCreator?: (schema?: SchemaDef) => void
   onCreateInstance?: (schemaId: string) => void
   onDeleteType?: (schemaId: string) => void
+  askPanel?: ReactNode
 }
 
 export function LeftDock({
@@ -67,6 +68,7 @@ export function LeftDock({
   onOpenSchemaCreator,
   onCreateInstance,
   onDeleteType,
+  askPanel,
 }: LeftDockProps) {
   const [internalTab, setInternalTab] = useState<Tab>('layers')
   const tab = activeTab ?? internalTab
@@ -240,6 +242,20 @@ export function LeftDock({
           Types
           <span className="dock-count">{types.length}</span>
         </button>
+        {askPanel && (
+          <button
+            type="button"
+            className={`dock-tab${tab === 'ask' ? ' is-active' : ''}`}
+            onClick={() => setTab('ask')}
+            role="tab"
+            id="dock-tab-ask"
+            aria-selected={tab === 'ask'}
+            aria-controls="dock-panel-ask"
+            tabIndex={tab === 'ask' ? 0 : -1}
+          >
+            Ask
+          </button>
+        )}
       </div>
 
       <div className="dock-body">
@@ -493,6 +509,14 @@ export function LeftDock({
               ))}
             </div>
           )}
+        </div>
+        <div
+          id="dock-panel-ask"
+          role="tabpanel"
+          aria-labelledby="dock-tab-ask"
+          hidden={tab !== 'ask'}
+        >
+          {askPanel}
         </div>
       </div>
     </aside>

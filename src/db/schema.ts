@@ -86,3 +86,13 @@ export const views = pgTable('views', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
+
+export const apiKeys = pgTable('api_keys', {
+  id: text().primaryKey(),
+  provider: text().notNull().unique(),
+  encryptedKey: text('encrypted_key').notNull(),
+  // optional base URL for custom/OpenAI-compatible providers
+  baseUrl: text('base_url'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
