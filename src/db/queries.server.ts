@@ -2,6 +2,7 @@ import { asc, desc, eq } from 'drizzle-orm'
 
 import { db } from './client.ts'
 import {
+  apiKeys,
   blocks,
   links,
   memberships,
@@ -27,6 +28,31 @@ export type ViewInsert = typeof views.$inferInsert
 
 export type LinkRow = typeof links.$inferSelect
 export type LinkInsert = typeof links.$inferInsert
+
+export type ApiKeyRow = typeof apiKeys.$inferSelect
+export type ApiKeyInsert = typeof apiKeys.$inferInsert
+
+// ---------- API Keys ----------
+
+export async function listApiKeys() {
+  return db.query.apiKeys.findMany()
+}
+
+export async function getApiKey(provider: string) {
+  return db.query.apiKeys.findFirst({ where: eq(apiKeys.provider, provider) })
+}
+
+export async function upsertApiKey(values: ApiKeyInsert) {
+  return db
+    .insert(apiKeys)
+    .values(values)
+    .onConflictDoUpdate({ target: apiKeys.provider, set: { encryptedKey: values.encryptedKey, baseUrl: values.baseUrl, updatedAt: new Date() } })
+    .returning()
+}
+
+export async function deleteApiKey(provider: string) {
+  return db.delete(apiKeys).where(eq(apiKeys.provider, provider)).returning()
+}
 
 // ---------- Blocks ----------
 

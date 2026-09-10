@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 
 import type {
+  ApiKeyInsert,
   BlockInsert,
   BlockRow,
   LinkInsert,
@@ -15,7 +16,10 @@ import type {
   ViewRow,
 } from './queries.server'
 
+import { encryptApiKey } from '#/lib/ai/encryption'
+
 import {
+  deleteApiKey,
   deleteBlock,
   deleteLink,
   deleteMembership,
@@ -40,6 +44,7 @@ import {
   updatePlacement,
   updateType,
   updateView,
+  upsertApiKey,
 } from './queries.server'
 
 // ---------- Blocks ----------
@@ -183,4 +188,23 @@ export const deleteLinkFn = createServerFn({ method: 'POST' })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
     return await deleteLink(data.id)
+  })
+
+// ---------- API Keys ----------
+
+// Note: listApiKeys/getApiKey (db helpers) are intentionally NOT exposed to the
+// client as server fns — they return secret material. The Ask panel only ever
+// upserts (encrypting first) and deletes keys.
+
+export const upsertApiKeyFn = createServerFn({ method: 'POST' })
+  .validator((input: ApiKeyInsert) => input)
+  .handler(async ({ data }) => {
+    const ciphertext = await encryptApiKey(data.encryptedKey)
+    return await upsertApiKey({ ...data, encryptedKey: ciphertext })
+  })
+
+export const deleteApiKeyFn = createServerFn({ method: 'POST' })
+  .validator((input: { provider: string }) => input)
+  .handler(async ({ data }) => {
+    return await deleteApiKey(data.provider)
   })

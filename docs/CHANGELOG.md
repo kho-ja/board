@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-09-10 — M15 (in progress): Ask, the AI assistant
+
+- **Ask panel** (`src/components/canvas/AskPanel.tsx`): a chat tab in the left
+  dock over `POST /api/chat` (`src/routes/api.chat.ts`, `@tanstack/ai`'s
+  `chat()` + SSE + AG-UI thread/resume, `maxIterations(8)`). Provider + model
+  pickers (choice persisted to localStorage), suggestion chips, thinking /
+  tool-call / approval cards in the thread, and localStorage conversation
+  persistence.
+- **Multi-provider adapters** (`src/lib/ai/providers.server.ts`): OpenAI,
+  OpenRouter, Ollama (local), and a custom OpenAI-compatible provider. Keys are
+  resolved DB-first (Ask panel "API Keys" section) then env fallback; adapters
+  are built per-request so config is always fresh.
+- **Key management + encryption at rest** (`api_keys` table,
+  `src/lib/ai/encryption.ts`): upsert/delete server fns; keys are AES-GCM
+  encrypted with a master key derived from `AI_ENCRYPTION_KEY` (32-byte base64)
+  and stored in `encrypted_key`. Without the env var the dev fallback stores
+  plaintext and the panel warns. Unit-tested (`encryption.test.ts`).
+- **Agent tools** (`src/lib/ai/tools.ts`, approval-gated):
+  - `board_context` — read-only full-board snapshot (blocks incl. text bodies and
+    custom-type field values, typed connections, memberships, type schemas).
+  - `board_create_blocks` — unplaced text/file-group/custom-type blocks.
+  - `board_connect_blocks` — typed `depends-on` / `responsible-for` / `part-of` /
+    `related-to` edges with semantic dedupe against existing links.
+  Both mutation tools require user approval before running.
+- **Snapshot serialization** (`src/lib/ai/board.ts`, unit-tested): compact
+  JSON-safe view of the live rows with `placed` / `group` / `in-group` flags,
+  per-block titles/bodies/fields, and normalized connections.
+- **Ask persona** (`src/lib/ai/system.ts`): read-snapshot-first + never-invent-ids
+  rules guiding tool use.
+- **Markdown in assistant messages**: assistant text parts render through
+  `@tanstack/markdown` with the shared board theme components
+  (`src/lib/markdown/components.tsx`, also used by text blocks), so lists, code
+  blocks, headings etc. display live while streaming.
+
 ## 2026-09-09 — M14: Board Search (Ctrl/Cmd+K)
 
 - **Command palette** (`src/components/canvas/SearchOverlay.tsx`): `Ctrl+K` /

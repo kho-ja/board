@@ -108,7 +108,13 @@ things are done before they are done.
 
 ## In progress
 
-- None (Milestone 14 completed).
+- **M15 — Ask, the AI assistant:** agentic chat over the whole board in the left
+  dock ("Ask" tab). Multi-provider (OpenAI / OpenRouter / Ollama / custom
+  OpenAI-compatible), per-provider model choice, and API-key management stored
+  AES-GCM encrypted at rest (dev fallback plaintext without `AI_ENCRYPTION_KEY`).
+  Tools: `board_context` (read-only snapshot of blocks/connections/types/
+  memberships), `board_create_blocks` and `board_connect_blocks` (mutation,
+  gated behind per-call user approval). Working tree, uncommitted.
 
 ## Next (in rough order)
 
