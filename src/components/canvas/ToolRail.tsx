@@ -13,6 +13,9 @@ interface ToolRailProps {
   /** M13 — connection type scrubber while the Connector tool is active. */
   connectionType?: ConnectionType
   onConnectionTypeChange?: (type: ConnectionType) => void
+  /** M18 UI — Ask assistant lives in the left rail so it is always reachable. */
+  aiOpen?: boolean
+  onToggleAI?: () => void
 }
 
 function ToolIcon({ tool }: { tool: Tool }) {
@@ -62,7 +65,14 @@ function ToolIcon({ tool }: { tool: Tool }) {
   }
 }
 
-export function ToolRail({ tool, onSelect, connectionType, onConnectionTypeChange }: ToolRailProps) {
+export function ToolRail({
+  tool,
+  onSelect,
+  connectionType,
+  onConnectionTypeChange,
+  aiOpen = false,
+  onToggleAI,
+}: ToolRailProps) {
   return (
     <nav className="tool-rail" aria-label="Tools">
       {TOOLS.map(({ id, label, shortcut }) => (
@@ -102,6 +112,27 @@ export function ToolRail({ tool, onSelect, connectionType, onConnectionTypeChang
             </button>
           ))}
         </div>
+      )}
+
+      {onToggleAI && (
+        <>
+          <div className="tool-rail-spacer" aria-hidden="true" />
+          <button
+            type="button"
+            className={`tool-button ai-rail-button${aiOpen ? ' is-active' : ''}`}
+            onClick={onToggleAI}
+            aria-label="Ask — the AI assistant (Ctrl+I)"
+            aria-pressed={aiOpen}
+            title="Ask — the AI assistant (Ctrl+I)"
+          >
+            <span className="tool-ai-glyph" aria-hidden="true">
+              ✦
+            </span>
+            <span className="tool-shortcut" aria-hidden="true">
+              I
+            </span>
+          </button>
+        </>
       )}
     </nav>
   )

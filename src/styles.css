@@ -438,9 +438,80 @@ a {
   backdrop-filter: blur(12px);
 }
 
+/* M18 UI — the Ask assistant panel: takes over the left panel in place of the
+   Layers/Assets/Types dock (the dock is swapped out, not covered), at the same
+   224px width so the canvas never shifts. */
+.ai-drawer {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 224px;
+  border-right: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface-strong) 90%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.ai-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  flex: none;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ai-drawer-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sea-ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ai-drawer-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--lagoon) 22%, transparent);
+  color: var(--lagoon-deep);
+  font-size: 0.72rem;
+}
+
+.ai-drawer-close {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sea-ink-soft);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ai-drawer-close:hover {
+  background: color-mix(in oklab, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+
+.ai-drawer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .dock-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.15rem;
   padding: 0.5rem 0.5rem 0.4rem;
   border-bottom: 1px solid var(--line);
@@ -1303,6 +1374,22 @@ a {
 
 .group-create-button:hover {
   background: color-mix(in oklab, var(--lagoon) 22%, transparent);
+}
+
+/* M18 UI — Ask assistant toggle pinned to the bottom of the left tool rail.
+   The button reuses `.tool-button` so it gets the same size + accent (`.is-active`)
+   as the drawing tools; the ✦ glyph and the separator below it are rail-specific. */
+.tool-rail-spacer {
+  flex: none;
+  margin-top: auto;
+  height: 0.5rem;
+  margin-bottom: 0.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.tool-ai-glyph {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .block-shell.is-group {
@@ -2643,6 +2730,251 @@ a {
   min-height: 0;
 }
 
+/* M18 — thread toolbar + history + search */
+.ask-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-newchat,
+.ask-history-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 0;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--lagoon) 16%, transparent);
+  color: var(--sea-ink);
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ask-newchat:hover,
+.ask-history-toggle:hover {
+  background: color-mix(in oklab, var(--lagoon) 26%, transparent);
+}
+
+/* M18 UI — toolbar gear that opens the Ask settings dialog */
+.ask-settings-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sea-ink-soft);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ask-settings-btn:hover {
+  background: color-mix(in oklab, var(--lagoon) 18%, transparent);
+  color: var(--sea-ink);
+}
+
+.ask-newchat:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ask-newchat span {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.ask-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--chip-bg);
+  color: var(--sea-ink);
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.ask-search-input::placeholder {
+  color: var(--sea-ink-soft);
+}
+
+.ask-search-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
+}
+
+.ask-history-toggle {
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.ask-history-toggle.is-open {
+  background: color-mix(in oklab, var(--lagoon) 20%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 34%, transparent) inset;
+}
+
+.ask-history-count {
+  min-width: 1.1rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--lagoon) 24%, transparent);
+  padding: 0.03rem 0.32rem;
+  font-size: 0.64rem;
+}
+
+.ask-search-results,
+.ask-history {
+  max-height: 12rem;
+  overflow: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-search-empty {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  color: var(--sea-ink-soft);
+  font-size: 0.74rem;
+}
+
+.ask-search-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--sea-ink);
+  padding: 0.35rem 0.6rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ask-search-hit:last-child {
+  border-bottom: 0;
+}
+
+.ask-search-hit:hover {
+  background: color-mix(in oklab, var(--lagoon) 14%, transparent);
+}
+
+.ask-search-hit.is-active {
+  background: color-mix(in oklab, var(--lagoon) 22%, transparent);
+}
+
+.ask-search-hit-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ask-search-hit-snippet {
+  color: var(--sea-ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ask-search-hit-snippet mark {
+  background: color-mix(in oklab, var(--lagoon) 30%, transparent);
+  color: var(--sea-ink);
+  border-radius: 3px;
+}
+
+.ask-search-hit-meta {
+  align-self: flex-start;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--lagoon) 16%, transparent);
+  padding: 0.02rem 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ask-history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-history-row:last-child {
+  border-bottom: 0;
+}
+
+.ask-history-row.is-active {
+  background: color-mix(in oklab, var(--lagoon) 16%, transparent);
+}
+
+.ask-history-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+  border: 0;
+  background: transparent;
+  color: var(--sea-ink);
+  padding: 0.5rem 0.55rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ask-history-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ask-history-meta {
+  color: var(--sea-ink-soft);
+  font-size: 0.66rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ask-history-del {
+  flex: none;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sea-ink-soft);
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.35rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ask-history-del:hover {
+  background: color-mix(in oklab, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
 .ask-config {
   display: flex;
   flex-direction: column;
@@ -2711,6 +3043,23 @@ a {
 
 .ask-notconfigured {
   color: var(--danger);
+}
+
+.ask-notconfigured-link {
+  display: inline-flex;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lagoon-deep);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.ask-notconfigured-link:hover {
+  color: var(--lagoon);
 }
 
 .ask-suggestions {
@@ -3071,5 +3420,280 @@ a {
   color: var(--sea-ink-soft);
   font-size: 0.62rem;
   line-height: 1.4;
+}
+
+/* M18 UI — Ask "home" (chat list + search, the landing view) */
+.ask-home {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.ask-home-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.55rem 0.6rem 0.4rem;
+}
+
+.ask-home-title {
+  color: var(--sea-ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ask-search-main {
+  flex: none;
+  margin: 0 0.6rem 0.45rem;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.76rem;
+}
+
+.ask-home-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0 0.6rem 0.6rem;
+}
+
+.ask-home-list.ask-search-results {
+  max-height: none;
+  border-bottom: 0;
+  gap: 0.3rem;
+}
+
+.ask-home-list .ask-history-row {
+  border: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 9px;
+  background: color-mix(in oklab, var(--surface) 72%, transparent);
+}
+
+.ask-home-list .ask-history-row.is-active {
+  background: color-mix(in oklab, var(--lagoon) 16%, transparent);
+}
+
+.ask-home-list .ask-history-row:hover {
+  background: color-mix(in oklab, var(--lagoon) 8%, var(--surface));
+}
+
+.ask-home-list .ask-search-hit {
+  border: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0.5rem 0.55rem;
+}
+
+.ask-home-list .ask-search-hit:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+/* M18 UI — chat header: back, thread title, inline model picker, settings */
+.ask-chat-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-chat-head-top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ask-back {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sea-ink-soft);
+  cursor: pointer;
+}
+
+.ask-back:hover {
+  background: color-mix(in oklab, var(--lagoon) 18%, transparent);
+  color: var(--sea-ink);
+}
+
+.ask-chat-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sea-ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.ask-model-inline {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ask-model-inline-label {
+  color: var(--sea-ink-soft);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ask-model-inline-input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--chip-bg);
+  color: var(--sea-ink);
+  padding: 0.32rem 0.4rem;
+  font: inherit;
+  font-size: 0.7rem;
+}
+
+.ask-model-inline-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
+}
+
+/* M18 UI — Ask settings dialog: provider & model config, API keys */
+.ask-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(23, 58, 64, 0.35);
+  backdrop-filter: blur(3px);
+}
+
+.ask-settings-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(84dvh, 680px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-strong);
+  box-shadow: 0 18px 60px rgba(23, 58, 64, 0.35);
+  overflow: hidden;
+}
+
+.ask-settings-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-settings-title {
+  color: var(--sea-ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ask-settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+}
+
+/* M18 UI — stacked (label-above-control) rows inside the dialog so setting up
+   a new provider gets plenty of room. */
+.ask-settings-body .ask-config-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+}
+
+.ask-settings-body .ask-label {
+  width: auto;
+  margin: 0;
+}
+
+.ask-settings-body .ask-select,
+.ask-settings-body .ask-model-input {
+  padding: 0.45rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.ask-settings-body .ask-keys-section {
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+}
+
+.ask-settings-body .ask-key-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0.55rem 0.6rem;
+}
+
+.ask-settings-body .ask-key-label {
+  width: auto;
+  font-size: 0.74rem;
+}
+
+.ask-settings-body .ask-key-edit {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.ask-settings-body .ask-key-input {
+  width: 100%;
+  padding: 0.42rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.ask-settings-body .ask-base-url-input {
+  width: 100%;
+}
+
+.ask-settings-body .ask-key-actions {
+  justify-content: flex-end;
+}
+
+.ask-settings-body .ask-key-status {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ask-settings-footer {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--line);
 }
 

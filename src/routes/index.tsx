@@ -30,6 +30,7 @@ import {
 } from '#/lib/board/connections'
 import type { ConnectionType } from '#/types'
 import { MiniMap } from '#/components/canvas/MiniMap'
+import { AIDrawer } from '#/components/canvas/AIDrawer'
 import {
   alignTargets,
   distributeTargets,
@@ -213,7 +214,8 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
   const [measuredSizes, setMeasuredSizes] = useState<Map<string, { width: number; height: number }>>(
     () => new Map(),
   )
-  const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types' | 'ask'>('layers')
+  const [dockTab, setDockTab] = useState<'layers' | 'assets' | 'types'>('layers')
+  const [aiOpen, setAiOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [miniMapOpen, setMiniMapOpen] = useState(true)
   const [spaceHeld, setSpaceHeld] = useState(false)
@@ -1851,6 +1853,11 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           setSearchOpen((prev) => !prev)
           return
         }
+        if (key === 'i') {
+          event.preventDefault()
+          setAiOpen((open) => !open)
+          return
+        }
         if (event.altKey) return
       } else if (event.altKey) {
         return
@@ -1995,8 +2002,15 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           onSelect={setTool}
           connectionType={pendingLinkType}
           onConnectionTypeChange={setPendingLinkType}
+          aiOpen={aiOpen}
+          onToggleAI={() => setAiOpen((open) => !open)}
         />
-        <LeftDock
+        {aiOpen ? (
+          <AIDrawer onClose={() => setAiOpen(false)}>
+            <AskPanel onFocusBlock={focusBlock} />
+          </AIDrawer>
+        ) : (
+          <LeftDock
           placed={placements.map((placement) => ({
             placement,
             block: byId.get(placement.blockId),
@@ -2016,8 +2030,8 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           onOpenSchemaCreator={handleOpenSchemaCreator}
           onCreateInstance={handleCreateInstance}
           onDeleteType={handleDeleteType}
-          askPanel={<AskPanel onFocusBlock={focusBlock} />}
-        />
+          />
+        )}
         <div className="canvas-area">
           <Canvas
             containerRef={containerRef}
