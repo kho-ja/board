@@ -3,22 +3,35 @@ import {
   localStoragePersistence,
   useChat,
 } from '@tanstack/ai-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Markdown } from '@tanstack/markdown/react'
 
+import type { UIMessage } from '@tanstack/ai-client'
+
 import { listAiProvidersFn } from '#/lib/ai/providers.functions'
-import {
-  deleteApiKeyFn,
-  upsertApiKeyFn,
-} from '#/db/queries.functions'
 import { AI_TOOL_NAMES, aiTools } from '#/lib/ai/tools'
+import { AskSettings } from './AskSettings'
 import { markdownComponents } from '#/lib/markdown/components'
+import {
+  CHAT_PREFIX,
+  DEFAULT_TITLE,
+  loadActiveThreadId,
+  loadThreadIndex,
+  migrateLegacyThread,
+  newThreadId,
+  readThreadBlob,
+  saveActiveThreadId,
+  saveThreadIndex,
+  searchThreads,
+  threadMetaFromMessages,
+  type ChatSearchHit,
+  type ThreadMeta,
+} from '#/lib/chat/history'
 
 import type { AiProviderInfo } from '#/lib/ai/providers.server'
 
-const THREAD_ID = 'khoja-board-ask'
 const PROV_STORAGE = 'khoja.ai.provider'
 const MODEL_STORAGE = 'khoja.ai.model'
 
@@ -94,118 +107,88 @@ function extractCreatedBlockIds(part: {
     .map((result) => (result as { id: string }).id)
 }
 
-export function AskPanel({
+function makeEmptyThread(): ThreadMeta {
+  return {
+    id: newThreadId(),
+    title: DEFAULT_TITLE,
+    createdAt: Date.now(),
+    lastMessageAt: Date.now(),
+    messageCount: 0,
+  }
+}
+
+/** One-time mount: load the thread index, migrating the legacy single-thread
+ *  blob on first run, and never leave an index without at least one thread. */
+function initializeThreads(): ThreadMeta[] {
+  let threads = loadThreadIndex()
+  if (threads.length === 0) {
+    const migrated = migrateLegacyThread()
+    threads = [migrated ?? makeEmptyThread()]
+    saveThreadIndex(threads)
+  }
+  return threads
+}
+
+function formatWhen(ts: number): string {
+  const date = new Date(ts)
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+  const days = Math.floor((now.getTime() - ts) / 86_400_000)
+  if (days > 0 && days < 7) return `${days}d ago`
+  return date.toLocaleDateString()
+}
+
+/** Wrap the query's occurrences in a snippet with <mark> (case-insensitive). */
+function highlight(snippet: string, query: string): React.ReactNode[] {
+  const q = query.trim()
+  if (!q) return [snippet]
+  const ql = q.toLowerCase()
+  const out: React.ReactNode[] = []
+  let i = 0
+  let at = snippet.toLowerCase().indexOf(ql)
+  let key = 0
+  while (at >= 0) {
+    if (at > i) out.push(snippet.slice(i, at))
+    out.push(
+      <mark key={key++}>{snippet.slice(at, at + q.length)}</mark>,
+    )
+    i = at + q.length
+    at = snippet.toLowerCase().indexOf(ql, i)
+  }
+  if (i < snippet.length) out.push(snippet.slice(i))
+  return out
+}
+
+/**
+ * M18 — one live Ask conversation. Remounted with `key={threadId}` so each
+ * thread owns its own `useChat` client and persists under its own
+ * `khoja.chat.<threadId>` blob.
+ */
+function AskThread({
+  threadId,
+  body,
+  canSend,
+  disabledReason,
   onFocusBlock,
+  onConversationChanged,
+  onOpenSettings,
 }: {
-  /** Given a block id that a tool just created, pans/selects it on the canvas
-   *  (used to bring freshly-drawn diagrams into view). */
+  threadId: string
+  body: Record<string, unknown>
+  canSend: boolean
+  disabledReason: string | null
   onFocusBlock?: (blockId: string) => void
+  onConversationChanged: (messages: UIMessage[]) => void
+  onOpenSettings?: () => void
 }) {
-  const queryClient = useQueryClient()
-
-  const { data: providers = [] } = useQuery<AiProviderInfo[]>({
-    queryKey: ['ask-providers'],
-    queryFn: () => listAiProvidersFn(),
-    staleTime: 60_000,
-  })
-
-  const firstAvailable = providers.find((p) => p.available)
-
-  const [providerId, setProviderId] = useState<string>(() => {
-    const stored = localStorage.getItem(PROV_STORAGE)
-    return stored ?? ''
-  })
-  const [model, setModel] = useState<string>(
-    () => localStorage.getItem(MODEL_STORAGE) ?? '',
-  )
-
-  // API key management state
-  const [editingKey, setEditingKey] = useState<string | null>(null)
-  const [keyInput, setKeyInput] = useState('')
-  const [baseUrlInput, setBaseUrlInput] = useState('')
-  const [upsertKeyPending, setUpsertKeyPending] = useState<string | null>(null)
-  const [deleteKeyPending, setDeleteKeyPending] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (providerId) {
-      if (!providers.some((p) => p.id === providerId && p.available)) {
-        if (firstAvailable) {
-          setProviderId(firstAvailable.id)
-          setModel(firstAvailable.defaultModel)
-        }
-      }
-      return
-    }
-    if (firstAvailable) {
-      setProviderId(firstAvailable.id)
-      setModel(firstAvailable.defaultModel)
-    } else {
-      const first = providers[0]
-      if (first) {
-        setProviderId(first.id)
-        setModel(first.defaultModel)
-      }
-    }
-  }, [providers, providerId, firstAvailable])
-
-  const activeProvider = providers.find((p) => p.id === providerId)
-  const canSend = Boolean(activeProvider?.available && model.trim() && providers.length)
-
-  const selectProvider = (id: string) => {
-    setProviderId(id)
-    const next = providers.find((p) => p.id === id)
-    if (next) {
-      const modelValue = next.defaultModel
-      setModel(modelValue)
-      localStorage.setItem(MODEL_STORAGE, modelValue)
-    }
-    localStorage.setItem(PROV_STORAGE, id)
-  }
-
-  const saveKey = async (provider: string) => {
-    if (!keyInput.trim()) return
-    setUpsertKeyPending(provider)
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (upsertApiKeyFn as any)({
-        provider,
-        encryptedKey: keyInput.trim(),
-        baseUrl: baseUrlInput.trim() || undefined,
-      })
-      queryClient.invalidateQueries({ queryKey: ['ask-providers'] })
-      setEditingKey(null)
-      setKeyInput('')
-      setBaseUrlInput('')
-    } finally {
-      setUpsertKeyPending(null)
-    }
-  }
-
-  const deleteKey = async (provider: string) => {
-    setDeleteKeyPending(provider)
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (deleteApiKeyFn as any)({ provider })
-      queryClient.invalidateQueries({ queryKey: ['ask-providers'] })
-    } finally {
-      setDeleteKeyPending(null)
-    }
-  }
-
-  const startEditKey = (provider: string, currentBaseUrl?: string) => {
-    setEditingKey(provider)
-    setKeyInput('')
-    setBaseUrlInput(currentBaseUrl ?? '')
-  }
-
-  const body = useMemo(() => ({ provider: providerId, model }), [providerId, model])
-
   const chat = useChat({
-    threadId: THREAD_ID,
+    threadId,
     connection: fetchServerSentEvents('/api/chat'),
     body,
     tools: aiTools,
-    persistence: localStoragePersistence(),
+    persistence: localStoragePersistence({ keyPrefix: CHAT_PREFIX }),
   })
 
   const { messages, sendMessage, interrupts, resuming, interruptErrors } = chat
@@ -228,6 +211,10 @@ export function AskPanel({
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight })
   }, [messages, approvalInterrupts.length, resuming])
+
+  useEffect(() => {
+    onConversationChanged(messages)
+  }, [messages, onConversationChanged])
 
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -273,142 +260,7 @@ export function AskPanel({
   }, [messages, onFocusBlock])
 
   return (
-    <div className="ask-panel">
-      <div className="ask-config">
-        <div className="ask-config-row">
-          <label className="ask-label" htmlFor="ask-provider">
-            Provider
-          </label>
-          <select
-            id="ask-provider"
-            className="ask-select"
-            value={providerId}
-            onChange={(e) => selectProvider(e.target.value)}
-          >
-            {providers.map((p) => (
-              <option key={p.id} value={p.id} disabled={!p.available}>
-                {p.label}
-                {p.available ? '' : ' (not configured)'}
-                {p.userConfigured ? ' ✓' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="ask-config-row">
-          <label className="ask-label" htmlFor="ask-model">
-            Model
-          </label>
-          <input
-            id="ask-model"
-            className="ask-model-input"
-            list="ask-model-options"
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value)
-              localStorage.setItem(MODEL_STORAGE, e.target.value)
-            }}
-            spellCheck={false}
-            placeholder="e.g. gpt-5.4-mini"
-          />
-          <datalist id="ask-model-options">
-            {(activeProvider?.models ?? []).map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
-        </div>
-
-        {/* API Key Management */}
-        <details className="ask-keys-section">
-          <summary className="ask-keys-summary">
-            API Keys {providers.some((p) => p.userConfigured) && (
-              <span className="ask-keys-badge">{providers.filter((p) => p.userConfigured).length}</span>
-            )}
-          </summary>
-          <div className="ask-keys-list">
-            {providers
-              .filter((p) => p.id !== 'ollama')
-              .map((p) => (
-                <div key={p.id} className="ask-key-row">
-                  <span className="ask-key-label">{p.label}</span>
-                  {editingKey === p.id ? (
-                    <div className="ask-key-edit">
-                      <input
-                        type="password"
-                        className="ask-key-input"
-                        placeholder="Enter API key"
-                        value={keyInput}
-                        onChange={(e) => setKeyInput(e.target.value)}
-                        autoFocus
-                      />
-                      {(p.id === 'custom' || p.id === 'openrouter') && (
-                        <input
-                          type="text"
-                          className="ask-key-input ask-base-url-input"
-                          placeholder="Base URL (optional)"
-                          value={baseUrlInput}
-                          onChange={(e) => setBaseUrlInput(e.target.value)}
-                        />
-                      )}
-                      <div className="ask-key-actions">
-                        <button
-                          type="button"
-                          className="ask-btn primary ask-btn-sm"
-                          onClick={() => saveKey(p.id)}
-                          disabled={upsertKeyPending === p.id}
-                        >
-                          {upsertKeyPending === p.id ? 'Saving…' : 'Save'}
-                        </button>
-                        <button
-                          type="button"
-                          className="ask-btn ghost ask-btn-sm"
-                          onClick={() => setEditingKey(null)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="ask-key-status">
-                      {p.userConfigured ? (
-                        <>
-                          <span className="ask-key-configured">Configured ✓</span>
-                          <button
-                            type="button"
-                            className="ask-btn ghost ask-btn-sm"
-                            onClick={() => startEditKey(p.id)}
-                          >
-                            Change
-                          </button>
-                          <button
-                            type="button"
-                            className="ask-btn ghost ask-btn-sm ask-btn-danger"
-                            onClick={() => deleteKey(p.id)}
-                            disabled={deleteKeyPending === p.id}
-                          >
-                            {deleteKeyPending === p.id ? 'Removing…' : 'Remove'}
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="ask-btn primary ask-btn-sm"
-                          onClick={() => startEditKey(p.id)}
-                        >
-                          Add Key
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
-          <p className="ask-keys-note">
-            Keys are encrypted at rest. Ollama runs locally and needs no key.
-            {process.env.AI_ENCRYPTION_KEY ? '' : ' ⚠️ Set AI_ENCRYPTION_KEY in .env.local for production encryption.'}
-          </p>
-        </details>
-      </div>
-
+    <>
       <div className="ask-thread" ref={threadRef}>
         {messages.length === 0 ? (
           <div className="ask-empty">
@@ -428,11 +280,18 @@ export function AskPanel({
                 ))}
               </div>
             )}
-            {!canSend && providers.length > 0 && (
+            {!canSend && disabledReason && (
               <p className="ask-notconfigured">
-                {!activeProvider?.available
-                  ? `No AI provider is configured yet. Add an API key above or set ${activeProvider?.configHint} in .env.local.`
-                  : 'Enter a model name above to continue.'}
+                {disabledReason}
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    className="ask-notconfigured-link"
+                    onClick={onOpenSettings}
+                  >
+                    Open settings
+                  </button>
+                )}
               </p>
             )}
           </div>
@@ -565,7 +424,9 @@ export function AskPanel({
           className="ask-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={canSend ? 'Ask about your board…' : 'Configure a provider to chat'}
+          placeholder={
+            canSend ? 'Ask about your board…' : 'Open Ask settings to configure a provider'
+          }
           disabled={!canSend}
         />
         <button
@@ -576,6 +437,381 @@ export function AskPanel({
           {resuming ? '…' : 'Send'}
         </button>
       </form>
+    </>
+  )
+}
+
+export function AskPanel({
+  onFocusBlock,
+}: {
+  /** Given a block id that a tool just created, pans/selects it on the canvas
+   *  (used to bring freshly-drawn diagrams into view). */
+  onFocusBlock?: (blockId: string) => void
+}) {
+  const { data: providers = [] } = useQuery<AiProviderInfo[]>({
+    queryKey: ['ask-providers'],
+    queryFn: () => listAiProvidersFn(),
+    staleTime: 60_000,
+  })
+
+  const firstAvailable = providers.find((p) => p.available)
+
+  const [providerId, setProviderId] = useState<string>(() => {
+    const stored = localStorage.getItem(PROV_STORAGE)
+    return stored ?? ''
+  })
+  const [model, setModel] = useState<string>(
+    () => localStorage.getItem(MODEL_STORAGE) ?? '',
+  )
+
+  const setModelValue = useCallback((value: string) => {
+    setModel(value)
+    localStorage.setItem(MODEL_STORAGE, value)
+  }, [])
+
+  // M18 UI — provider/model live in a settings dialog, not the chat panel.
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  // M18 — thread history state
+  const [threads, setThreads] = useState<ThreadMeta[]>(initializeThreads)
+  const [activeThreadId, setActiveThreadId] = useState<string>(() => {
+    const saved = loadActiveThreadId()
+    const index = loadThreadIndex()
+    if (saved && index.some((t) => t.id === saved)) return saved
+    if (index[0]) {
+      saveActiveThreadId(index[0].id)
+      return index[0].id
+    }
+    const fresh = makeEmptyThread()
+    saveThreadIndex([fresh])
+    saveActiveThreadId(fresh.id)
+    return fresh.id
+  })
+  // Landing view: chat list + search first; clicking a thread enters it.
+  const [home, setHome] = useState(true)
+  const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<ChatSearchHit[]>([])
+
+  useEffect(() => {
+    if (providerId) {
+      if (!providers.some((p) => p.id === providerId && p.available)) {
+        if (firstAvailable) {
+          setProviderId(firstAvailable.id)
+          setModel(firstAvailable.defaultModel)
+        }
+      }
+      return
+    }
+    if (firstAvailable) {
+      setProviderId(firstAvailable.id)
+      setModel(firstAvailable.defaultModel)
+    } else {
+      const first = providers[0]
+      if (first) {
+        setProviderId(first.id)
+        setModel(first.defaultModel)
+      }
+    }
+  }, [providers, providerId, firstAvailable])
+
+  const activeProvider = providers.find((p) => p.id === providerId)
+  const canSend = Boolean(activeProvider?.available && model.trim() && providers.length)
+  const disabledReason =
+    !canSend && providers.length > 0
+      ? activeProvider?.available
+        ? 'Enter a model name in Ask settings to continue.'
+        : `No AI provider is configured yet. Add an API key in Ask settings or set ${activeProvider?.configHint} in .env.local.`
+      : null
+
+  const selectProvider = (id: string) => {
+    setProviderId(id)
+    const next = providers.find((p) => p.id === id)
+    if (next) {
+      const modelValue = next.defaultModel
+      setModel(modelValue)
+      localStorage.setItem(MODEL_STORAGE, modelValue)
+    }
+    localStorage.setItem(PROV_STORAGE, id)
+  }
+
+  const body = useMemo(() => ({ provider: providerId, model }), [providerId, model])
+
+  const syncThread = useCallback(
+    (messages: UIMessage[]) => {
+      setThreads((prev) => {
+        if (!activeThreadId) return prev
+        const meta = threadMetaFromMessages(activeThreadId, messages)
+        let changed = false
+        const next = prev.map((t) => {
+          if (t.id !== activeThreadId) return t
+          if (
+            t.title === meta.title &&
+            t.lastMessageAt === meta.lastMessageAt &&
+            t.messageCount === meta.messageCount
+          ) {
+            return t
+          }
+          changed = true
+          return {
+            ...t,
+            title: meta.title,
+            lastMessageAt: meta.lastMessageAt,
+            messageCount: meta.messageCount,
+          }
+        })
+        if (!changed) return prev
+        next.sort((a, b) => b.lastMessageAt - a.lastMessageAt)
+        saveThreadIndex(next)
+        return next
+      })
+    },
+    [activeThreadId],
+  )
+
+  const switchTo = useCallback(
+    (id: string) => {
+      if (id === activeThreadId) return
+      saveActiveThreadId(id)
+      setActiveThreadId(id)
+    },
+    [activeThreadId],
+  )
+
+  const startNewChat = useCallback(() => {
+    setQuery('')
+    setHits([])
+    const active = threads.find((t) => t.id === activeThreadId)
+    if (active && active.messageCount === 0) return
+    const fresh = makeEmptyThread()
+    const next = [fresh, ...threads].sort(
+      (a, b) => b.lastMessageAt - a.lastMessageAt,
+    )
+    saveThreadIndex(next)
+    setThreads(next)
+    saveActiveThreadId(fresh.id)
+    setActiveThreadId(fresh.id)
+  }, [threads, activeThreadId])
+
+  /** Enter a conversation from the home list/search. */
+  const enterThread = useCallback(
+    (id: string) => {
+      switchTo(id)
+      setHome(false)
+    },
+    [switchTo],
+  )
+
+  const enterNewChat = useCallback(() => {
+    startNewChat()
+    setHome(false)
+  }, [startNewChat])
+
+  const deleteThread = useCallback(
+    (id: string) => {
+      if (!window.confirm('Delete this chat and its history?')) return
+      try {
+        localStorage.removeItem(`${CHAT_PREFIX}${id}`)
+      } catch {
+        // best-effort
+      }
+      let next = threads.filter((t) => t.id !== id)
+      if (next.length === 0) next = [makeEmptyThread()]
+      next.sort((a, b) => b.lastMessageAt - a.lastMessageAt)
+      saveThreadIndex(next)
+      setThreads(next)
+      if (activeThreadId === id) {
+        const fallback = next[0]
+        saveActiveThreadId(fallback.id)
+        setActiveThreadId(fallback.id)
+      }
+    },
+    [threads, activeThreadId],
+  )
+
+  // M18 — search across every thread blob, re-run as the index or query moves.
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) {
+      setHits([])
+      return
+    }
+    setHits(searchThreads(q, threads, (id) => readThreadBlob(id)))
+  }, [query, threads])
+
+  const clearSearch = useCallback(() => {
+    setQuery('')
+    setHits([])
+  }, [])
+
+  const activeThread = threads.find((t) => t.id === activeThreadId)
+
+  return (
+    <div className="ask-panel">
+      {home ? (
+        <div className="ask-home">
+          <div className="ask-home-head">
+            <span className="ask-home-title">Chats</span>
+            <button
+              type="button"
+              className="ask-newchat"
+              onClick={enterNewChat}
+              title="Start a new chat"
+            >
+              <span aria-hidden="true">+</span> New chat
+            </button>
+          </div>
+
+          <input
+            type="search"
+            className="ask-search-input ask-search-main"
+            aria-label="Search past chats"
+            placeholder="Search past chats…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') clearSearch()
+            }}
+          />
+
+          {query.trim() ? (
+            <div className="ask-home-list ask-search-results">
+              {hits.length === 0 ? (
+                <p className="ask-search-empty">
+                  No matches for “{query.trim()}”.
+                </p>
+              ) : (
+                hits.map((hit, i) => (
+                  <button
+                    key={`${hit.threadId}:${hit.messageIndex}:${i}`}
+                    type="button"
+                    className={`ask-search-hit${
+                      hit.threadId === activeThreadId ? ' is-active' : ''
+                    }`}
+                    onClick={() => enterThread(hit.threadId)}
+                  >
+                    <span className="ask-search-hit-title">
+                      {hit.threadTitle}
+                    </span>
+                    <span className="ask-search-hit-snippet">
+                      {highlight(hit.snippet, query)}
+                    </span>
+                    <span className="ask-search-hit-meta">
+                      {hit.role === 'user' ? 'You' : 'Ask'}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="ask-home-list">
+              {threads.map((t) => (
+                <div
+                  key={t.id}
+                  className={`ask-history-row${
+                    t.id === activeThreadId ? ' is-active' : ''
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="ask-history-main"
+                    onClick={() => enterThread(t.id)}
+                  >
+                    <span className="ask-history-title">{t.title}</span>
+                    <span className="ask-history-meta">
+                      {t.messageCount === 0
+                        ? 'No messages yet'
+                        : `${t.messageCount} message${t.messageCount === 1 ? '' : 's'}`}{' '}
+                      · {formatWhen(t.lastMessageAt)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="ask-history-del"
+                    title="Delete chat"
+                    aria-label={`Delete chat ${t.title}`}
+                    onClick={() => deleteThread(t.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="ask-chat-head">
+            <div className="ask-chat-head-top">
+              <button
+                type="button"
+                className="ask-back"
+                onClick={() => setHome(true)}
+                aria-label="All chats"
+                title="All chats"
+              >
+                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+                  <path
+                    d="M10 3 5 8l5 5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <span className="ask-chat-title" title={activeThread?.title}>
+                {activeThread?.title ?? 'Chat'}
+              </span>
+              <button
+                type="button"
+                className="ask-settings-btn"
+                onClick={() => setSettingsOpen(true)}
+                title="Provider & model settings"
+                aria-label="Provider & model settings"
+              >
+                ⚙
+              </button>
+            </div>
+            <label className="ask-model-inline" title="Switch model">
+              <span className="ask-model-inline-label">Model</span>
+              <input
+                className="ask-model-inline-input"
+                list="ask-model-options-header"
+                value={model}
+                onChange={(e) => setModelValue(e.target.value)}
+                spellCheck={false}
+              />
+              <datalist id="ask-model-options-header">
+                {(activeProvider?.models ?? []).map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </label>
+          </div>
+
+          <AskThread
+            key={activeThreadId}
+            threadId={activeThreadId}
+            body={body}
+            canSend={canSend}
+            disabledReason={disabledReason}
+            onFocusBlock={onFocusBlock}
+            onConversationChanged={syncThread}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        </>
+      )}
+
+      <AskSettings
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        providers={providers}
+        providerId={providerId}
+        model={model}
+        onProviderChange={selectProvider}
+        onModelChange={setModelValue}
+      />
     </div>
   )
 }

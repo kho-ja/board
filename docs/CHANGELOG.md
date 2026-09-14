@@ -1,6 +1,95 @@
 # Changelog
 
-## 2026-09-11 — M17 (in progress): Block views — render how a block shows itself
+## 2026-09-14 — M18 UI: Ask lands on a chat list, model picker in-chat
+
+- **Chat list first**: opening the Ask panel lands on a "Chats" home screen —
+  a prominent search box on top plus every conversation (title, message count,
+  relative date) sorted by recency. Clicking a thread (or a cross-thread search
+  hit) enters that chat; "×" deletes from the list. The old always-visible
+  toolbar/search/history strip is gone — the panel is one clean list.
+- **Model picker in-chat**: the chat header now has ← All chats, the thread
+  title, an inline **Model** input with a suggestions dropdown (any value
+  allowed), and the ⚙ settings gear. The bottom status strip was removed;
+  changing the model applies immediately to the active conversation and
+  persists. Provider + API keys remain in the settings dialog.
+- Live-verified: home list + search on open, row → chat, back → list, search
+  hit jumps into its thread, inline model edit persists across enter/back and
+  reload.
+
+## 2026-09-14 — M18 UI: Provider & model settings move to a dialog
+
+- **Ask settings dialog** (`src/components/canvas/AskSettings.tsx`): the
+  provider picker, model input, and the whole API-key manager no longer hog
+  the chat panel. They live in a centered modal opened from the panel toolbar's
+  ⚙ gear (or the "Open settings" link in the empty-state hint); closes via ×,
+  Esc, or Done.
+- **Compact status strip** under the composer shows the active
+  `Provider · model` (with ✓ when the provider is configured) and opens
+  settings on click; the inline `.ask-config` block is gone from
+  `AskPanel.tsx` (its provider/model state and key handlers moved to the
+  dialog; the chat keeps the full panel width).
+- **Roomier layout**: the dialog is portaled to `document.body` (an ancestor's
+  `backdrop-filter` was trapping the fixed overlay inside the 224px panel) and
+  is 560px wide, with label-above-input stacked rows and full-width, vertically
+  stacked key-edit fields — plenty of space to add a new provider/key + base
+  URL.
+- Live-verified: no inline config, gear opens modal, model change reflects
+  instantly in the status strip, Esc/Done/× close, active provider/model
+  persist.
+
+## 2026-09-14 — M18 UI: Ask takes over the left panel, dock tidied
+
+- **AI panel replaces the dock** (`src/components/canvas/AIDrawer.tsx`): the
+  assistant is no longer a tab inside the Layers/Assets/Types dock. Toggled
+  from the tool rail, the left panel now *is* the Ask UI — the dock is swapped
+  out (unmounted) at the same 224px width, so the canvas never moves: layers
+  hide, Ask shows, and closing with its × or `Ctrl+I` brings the dock back.
+- **Toggle**: a "✦ I" button pinned to the **bottom of the left tool rail**
+  (active state while open, matching the drawing tools) plus a `Ctrl+I`
+  shortcut; the top-bar hint lists the shortcut.
+- **Durability**: chat content lives in per-thread `khoja.chat.<id>` blobs, so
+  every open restores the active conversation even though the panel remounts.
+- **Left dock cleanup**: removed the Ask tab (its tablist/panel code and the
+  `askPanel` slot are gone from `LeftDock.tsx`); the three remaining tabs
+  (Layers/Assets/Types) now share one `repeat(3, 1fr)` row instead of the
+  lopsided 2×2 grid. `index.tsx`'s `dockTab` union drops `'ask'`.
+- Live-verified: 3-tab dock by default, rail toggle ⇄ dock/AI swap at identical
+  geometry (canvas untouched), chat restored on re-open, Ctrl+I and × close.
+
+## 2026-09-14 — M18: Chat history & search across past conversations
+
+- **Per-thread persistence** (`src/lib/chat/history.ts`): each conversation is
+  its own `khoja.chat.<threadId>` blob (`ChatPersistedState`) under a `khoja.chat.`
+  key prefix — the same client-authoritative storage `useChat` already writes,
+  now namespaced per thread instead of one fixed id. A `khoja.chat.index` thread
+  index (id, title, created/last-message timestamps, message count) and
+  `khoja.chat.active` track the list and current thread. All blob/index reads
+  tolerate missing or corrupt data (best-effort, mirroring the persistence
+  layer itself).
+- **History UI** (`AskPanel.tsx`): a toolbar with "New chat", a "Chats" toggle
+  that reveals the thread list (most-recent-first, active highlighted, per-row
+  delete behind a confirm), and a search box. Each live conversation is its own
+  `AskThread` — a `useChat` client remounted with `key={threadId}` — so
+  switching threads cleanly hydrates that thread's blob. The index updates as
+  messages land (title = first user message; recency = last message time).
+- **Search across history**: the query scans every thread blob,
+  case-insensitive over text/thinking/tool-call/tool-result parts, renders each
+  snippet with the match `<mark>`-highlighted, and clicking a hit resumes that
+  thread while staying in search (Esc clears). Sorted by thread recency.
+- **Migration**: the legacy `tanstack-ai:khoja-board-ask` single-thread blob is
+  auto-migrated into the per-thread scheme on first run (blob copied under the
+  new key, legacy key removed).
+- **Tests**: `src/lib/chat/history.test.ts` — 25 tests over title/recency
+  extraction (incl. ISO-string timestamps after a JSON round-trip),
+  part/message text flattening, snippet windows, cross-thread search (ordering,
+  casing, max-hits, system-message skip), index/active round-trips, corrupt
+  blobs, and legacy migration.
+- **Live smoke**: the existing single-thread history migrated automatically;
+  a second thread created and answered; cross-thread search found content in
+  both; clicking a hit resumed the other conversation; new-thread title/recency
+  tracked; delete removed blob + index row; everything survived a page reload.
+
+## 2026-09-11 — M17: Block views — render how a block shows itself
 
 - **Views registry** (`src/lib/blocks/views.ts`): every block kind declares the
   switchable ways it can render (purely presentational — a view only picks
@@ -35,7 +124,7 @@
   header), Meta snaps to a compact chip, choices survive a page reload, and
   text blocks keep the browser's native menu.
 
-## 2026-09-11 — M16 (in progress): Ask, the builder
+## 2026-09-11 — M16: Ask, the builder
 
 - **`board_edit_blocks`** (`src/lib/ai/tools.ts` / `tools.server.ts`,
   approval-gated): rewrite a text block's markdown, set field values on a
@@ -59,7 +148,7 @@
 - **Ask persona updated** (`src/lib/ai/system.ts`): rule 3 now routes builder
   intent to the right tool and prefers one batched call over many.
 
-## 2026-09-10 — M15 (in progress): Ask, the AI assistant
+## 2026-09-10 — M15: Ask, the AI assistant
 
 - **Ask panel** (`src/components/canvas/AskPanel.tsx`): a chat tab in the left
   dock over `POST /api/chat` (`src/routes/api.chat.ts`, `@tanstack/ai`'s
