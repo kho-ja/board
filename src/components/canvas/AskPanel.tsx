@@ -26,6 +26,9 @@ const TOOL_LABELS: Record<string, string> = {
   [AI_TOOL_NAMES.context]: 'Read board snapshot',
   [AI_TOOL_NAMES.createBlocks]: 'Create blocks',
   [AI_TOOL_NAMES.connectBlocks]: 'Connect blocks',
+  [AI_TOOL_NAMES.editBlocks]: 'Edit blocks',
+  [AI_TOOL_NAMES.createFiles]: 'Create files',
+  [AI_TOOL_NAMES.makeDiagram]: 'Make diagram',
 }
 
 const SUGGESTIONS = [
@@ -56,7 +59,48 @@ function summarizeToolCallOutput(name: string, parsed: unknown): string {
   }
 }
 
-export function AskPanel() {
+/** M16 — pull the created block ids out of a completed board_make_diagram
+ *  tool-call (or its archived tool-result) so the client can pan to them. */
+function extractCreatedBlockIds(part: {
+  type: string
+  state?: string
+  output?: unknown
+  content?: unknown
+}): string[] {
+  let parsed: unknown = null
+  if (part.type === 'tool-call' && part.state === 'complete') {
+    parsed = part.output
+  } else if (part.type === 'tool-result') {
+    if (typeof part.content === 'string') {
+      try {
+        parsed = JSON.parse(part.content)
+      } catch {
+        parsed = null
+      }
+    } else {
+      parsed = part.content
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return []
+  const { results } = parsed as { results?: unknown }
+  if (!Array.isArray(results)) return []
+  return results
+    .filter(
+      (result): result is { id?: string } =>
+        Boolean(result) &&
+        typeof result === 'object' &&
+        typeof (result as { id?: string }).id === 'string',
+    )
+    .map((result) => (result as { id: string }).id)
+}
+
+export function AskPanel({
+  onFocusBlock,
+}: {
+  /** Given a block id that a tool just created, pans/selects it on the canvas
+   *  (used to bring freshly-drawn diagrams into view). */
+  onFocusBlock?: (blockId: string) => void
+}) {
   const queryClient = useQueryClient()
 
   const { data: providers = [] } = useQuery<AiProviderInfo[]>({
@@ -204,6 +248,29 @@ export function AskPanel() {
   const lastError = interruptErrors.length
     ? interruptErrors[interruptErrors.length - 1]
     : null
+
+  // M16 — after an approved diagram run, pan/select the first created node so
+  // the freshly-drawn diagram is immediately in view.
+  const handledDiagramRuns = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!onFocusBlock) return
+    let firstCreatedId: string | null = null
+    outer: for (const message of messages) {
+      if (message.role !== 'assistant') continue
+      for (const [index, part] of message.parts.entries()) {
+        if (part.type !== 'tool-call' && part.type !== 'tool-result') continue
+        if (part.name !== AI_TOOL_NAMES.makeDiagram) continue
+        const key = `${message.id}:${index}`
+        if (handledDiagramRuns.current.has(key)) continue
+        const ids = extractCreatedBlockIds(part)
+        if (!ids.length) continue
+        handledDiagramRuns.current.add(key)
+        firstCreatedId = ids[0]
+        break outer
+      }
+    }
+    if (firstCreatedId) onFocusBlock(firstCreatedId)
+  }, [messages, onFocusBlock])
 
   return (
     <div className="ask-panel">

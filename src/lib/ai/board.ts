@@ -132,6 +132,11 @@ export function blockBodyFromData(data: BlockData): string {
   if ('markdown' in data) {
     return (data.markdown ?? '').slice(0, TEXT_BODY_CHARS)
   }
+  if ('content' in data) {
+    // M16 — AI-authored inline files carry their content; show it to the model
+    // so it can answer about and edit the file's contents.
+    return String(data.content ?? '').slice(0, TEXT_BODY_CHARS)
+  }
   return ''
 }
 

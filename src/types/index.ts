@@ -6,11 +6,29 @@ export type BlockKind =
   | 'text'
   | (string & {})
 
+/**
+ * M17 — block-level render views. A view is a projection: it only decides
+ * which parts of a block's *existing* data are shown (never adds/removes
+ * data). Every block kind lists its own views (see `src/lib/blocks/views.ts`);
+ * a block stores its active view in its own data under `data.view`, falling
+ * back to the kind's default when unset.
+ */
+export type FileView = 'card' | 'content' | 'meta'
+
 export interface FileBlockData {
   kind: 'file'
   name: string
   size: number
   mimeType: string
+  /**
+   * M16 — optional inline file content (text; e.g. markdown, JSON, CSV, SVG).
+   * Files imported via upload remain metadata-only; files authored by the AI
+   * builder carry their content here so they are real, viewable files on the
+   * board without a blob store. `size` reflects the UTF-8 byte length.
+   */
+  content?: string
+  /** M17 — active render view; defaults to `card` when unset. */
+  view?: FileView
 }
 
 export interface FileGroupBlockData {

@@ -922,6 +922,221 @@ a {
   white-space: nowrap;
 }
 
+.file-card-preview {
+  margin-top: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.file-card-preview.is-text {
+  max-height: 180px;
+  background: color-mix(in oklab, var(--chip-bg) 92%, transparent);
+}
+
+.file-card-text {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  color: var(--sea-ink-soft);
+  font-size: 0.66rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.file-card-preview.is-svg {
+  display: inline-flex;
+  max-width: 240px;
+  background: #fff;
+}
+
+.file-card-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 160px;
+  object-fit: contain;
+}
+
+/* M17 — view-driven file rendering: the active view controls which parts of a
+   file block are shown AND its footprint on the canvas. Content view sizes the
+   shell to the media (capped ~360px); meta view snaps to a compact chip. */
+
+.block-shell[data-view='content'] {
+  width: max-content;
+  max-width: 360px;
+}
+
+.block-shell[data-view='meta'] {
+  width: max-content;
+  max-width: 240px;
+}
+
+.block-shell[data-view='content'] .file-card {
+  min-width: 140px;
+  max-width: 360px;
+}
+
+.block-shell[data-view='content'] .file-card-preview {
+  margin-top: 0;
+  border: 0;
+}
+
+.block-shell[data-view='content'] .file-card-preview.is-svg {
+  max-width: 360px;
+  max-height: 300px;
+}
+
+.block-shell[data-view='content'] .file-card-svg {
+  max-height: 300px;
+}
+
+.block-shell[data-view='content'] .file-card-preview.is-text {
+  max-height: 300px;
+  background: transparent;
+}
+
+.block-shell[data-view='content'] .file-card-text {
+  max-height: 300px;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.72rem;
+}
+
+.block-shell[data-view='content'] .file-card-content-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 150px;
+  max-width: 240px;
+  padding: 0.7rem 0.5rem;
+}
+
+.block-shell[data-view='content'] .file-card-content-empty .file-card-name {
+  text-align: center;
+  white-space: normal;
+  max-width: 220px;
+}
+
+.file-card-icon-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--lagoon) 12%, transparent);
+  color: var(--lagoon-deep);
+}
+
+.file-card-icon-emblem svg {
+  width: 26px;
+  height: 26px;
+}
+
+.block-shell[data-view='meta'] .file-card {
+  align-items: center;
+  max-width: 240px;
+}
+
+.block-shell[data-view='meta'] .file-card-icon-wrap {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.block-shell[data-view='meta'] .file-card-icon-wrap svg {
+  width: 13px;
+  height: 13px;
+}
+
+.block-shell[data-view='meta'] .file-card-name {
+  font-size: 0.72rem;
+  max-width: 180px;
+}
+
+.block-shell[data-view='meta'] .file-card-meta {
+  font-size: 0.62rem;
+}
+
+/* M17 — right-click view menu on placed blocks. */
+
+.block-ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.block-ctx-menu {
+  position: fixed;
+  z-index: 101;
+  min-width: 166px;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--surface-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.block-ctx-heading {
+  margin: 0 0 0.15rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--sea-ink-soft);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.block-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: none;
+  color: var(--sea-ink);
+  font-size: 0.74rem;
+  text-align: left;
+  cursor: default;
+}
+
+.block-ctx-item:hover {
+  background: color-mix(in oklab, var(--lagoon) 12%, transparent);
+}
+
+.block-ctx-item.is-active {
+  color: var(--lagoon-deep);
+  font-weight: 700;
+}
+
+.block-ctx-check {
+  display: inline-block;
+  width: 1rem;
+  flex: none;
+  color: var(--lagoon-deep);
+  font-weight: 700;
+}
+
+.block-ctx-divider {
+  margin: 0.3rem 0.15rem;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.block-ctx-muted {
+  margin: 0;
+  padding: 0 0.5rem 0.2rem;
+  color: color-mix(in oklab, var(--sea-ink-soft) 70%, transparent);
+  font-size: 0.62rem;
+  font-style: italic;
+}
+
 .canvas-viewport.is-drag-over {
   box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--lagoon) 70%, transparent);
 }
@@ -2599,7 +2814,8 @@ a {
   background: color-mix(in oklab, var(--danger) 18%, transparent);
 }
 
-.ask-tool-chip.is-done {
+.ask-tool-chip.is-done,
+.ask-tool-chip.is-complete {
   background: color-mix(in oklab, var(--conn-part) 18%, transparent);
 }
 

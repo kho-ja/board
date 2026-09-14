@@ -104,6 +104,18 @@ describe('blockBodyFromData', () => {
     expect(blockBodyFromData(groupBlock('g', 'x').data)).toBe('')
   })
 
+  it('returns inline file content for AI-authored files', () => {
+    const file = fileBlock('f', 'notes.md')
+    file.data = {
+      kind: 'file',
+      name: 'notes.md',
+      size: 7,
+      mimeType: 'text/markdown',
+      content: '# hello',
+    }
+    expect(blockBodyFromData(file.data)).toBe('# hello')
+  })
+
   it('truncates very long bodies', () => {
     const long = 'x'.repeat(TEXT_BODY_CHARS + 500)
     const body = blockBodyFromData(textBlock('a', long).data)

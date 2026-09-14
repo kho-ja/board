@@ -137,11 +137,168 @@ export const boardConnectBlocksDef = toolDefinition({
   }),
 })
 
-export const aiTools = [boardContextDef, boardCreateBlocksDef, boardConnectBlocksDef]
+/**
+ * M16 — edit existing board content. Mutates the database, so it is gated
+ * behind a user approval.
+ */
+export const boardEditBlocksDef = toolDefinition({
+  name: 'board_edit_blocks',
+  description:
+    'Edit existing blocks on the board. You may replace a text note\'s markdown, set field values on a structured card (keyed by the custom type field names), rename a file or file group, move/place a block (position), or any combination. Use the exact block ids and type names from board_context. Requires user approval before it runs.',
+  needsApproval: true,
+  inputSchema: z.object({
+    edits: z
+      .array(
+        z.object({
+          id: z.string().describe('Exact id of the block to edit (from board_context).'),
+          markdown: z
+            .string()
+            .optional()
+            .describe('Replaces the full text content of a text block.'),
+          values: z
+            .record(z.string(), fieldValueSchema)
+            .optional()
+            .describe("Sets field values on a structured card, keyed by the type's field names (from board_context). Omitted fields keep their current value."),
+          name: z
+            .string()
+            .optional()
+            .describe('New name for a file block or a file group.'),
+          position: z
+            .object({
+              x: z.number().describe('World-space X of the block top-left corner.'),
+              y: z.number().describe('World-space Y of the block top-left corner.'),
+            })
+            .optional()
+            .describe('Place the block on the canvas, or move it if already placed.'),
+        }),
+      )
+      .describe('The edits to apply (one or more).'),
+  }),
+  outputSchema: z.object({
+    results: z.array(
+      z.object({
+        id: z.string(),
+        ok: z.boolean(),
+        changed: z.array(z.string()).optional(),
+        error: z.string().optional(),
+      }),
+    ),
+  }),
+})
+
+/**
+ * M16 — author real (inline) files on the board: markdown, JSON, CSV, code,
+ * or SVG. SVG content renders as an image. Mutates the database, so it is
+ * gated behind a user approval.
+ */
+export const boardCreateFilesDef = toolDefinition({
+  name: 'board_create_files',
+  description:
+    'Create file blocks with real content right on the board. Each file stores its bytes as inline text content (markdown, plain text, JSON, CSV, source code, or SVG). SVG content (mimeType "image/svg+xml") renders as an image on the board. Files appear as unplaced assets in the Assets panel. Name files with an extension. Requires user approval before it runs.',
+  needsApproval: true,
+  inputSchema: z.object({
+    files: z
+      .array(
+        z.object({
+          name: z.string().describe('File name, including its extension (e.g. "changelog.md").'),
+          mimeType: z
+            .string()
+            .describe('MIME type of the content: text/plain, text/markdown, application/json, text/csv, text/html, image/svg+xml, application/javascript, etc. Use image/svg+xml for SVG diagrams/images.'),
+          content: z
+            .string()
+            .describe('The entire file content as text (SVG markup for image/svg+xml files).'),
+        }),
+      )
+      .describe('The files to create (one or more).'),
+  }),
+  outputSchema: z.object({
+    results: z.array(
+      z.object({
+        ok: z.boolean(),
+        id: z.string().optional(),
+        name: z.string(),
+        size: z.number().optional(),
+        error: z.string().optional(),
+      }),
+    ),
+  }),
+})
+
+/**
+ * M16 — compose a diagram out of native blocks + connections, laid out and
+ * placed on the canvas. Mutates the database, so it is gated behind a user
+ * approval.
+ */
+export const boardMakeDiagramDef = toolDefinition({
+  name: 'board_make_diagram',
+  description:
+    'Build a diagram on the canvas from scratch: describe the diagram nodes (boxes) and the edges between them; the tool creates one text block per node, lays them out in flow order (longest-path layering), places them on the canvas, and connects them with typed links. Nodes and edges are given by index (0-based position in the nodes array). Use cases: flowcharts, org charts, dependency graphs, mind maps, process diagrams. Requires user approval before it runs, then the diagram is arranged on the board.',
+  needsApproval: true,
+  inputSchema: z.object({
+    title: z
+      .string()
+      .optional()
+      .describe('A short label for the diagram (helps the summary text; the nodes carry the real content).'),
+    nodes: z
+      .array(
+        z.object({
+          label: z.string().describe('The visible text of this diagram box (keep it short).'),
+        }),
+      )
+      .describe('The diagram boxes, in order.'),
+    edges: z
+      .array(
+        z.object({
+          from: z.number().describe('Index (into nodes) of the source box.'),
+          to: z.number().describe('Index (into nodes) of the target box.'),
+          type: z
+            .enum(CONNECTION_TYPES)
+            .optional()
+            .describe('Connection type. Defaults to depends-on for flows; use part-of for hierarchies and related-to for undirected associations.'),
+          label: z.string().nullish().describe('Optional short edge note.'),
+        }),
+      )
+      .describe('The connections between the diagram boxes, as node indices.'),
+    direction: z
+      .enum(['left-to-right', 'top-to-bottom'])
+      .default('left-to-right')
+      .optional()
+      .describe('Flow direction of the layout.'),
+  }),
+  outputSchema: z.object({
+    anchor: z.object({ x: z.number(), y: z.number() }),
+    results: z.array(
+      z.object({
+        index: z.number(),
+        id: z.string(),
+        position: z.object({ x: z.number(), y: z.number() }),
+      }),
+    ),
+    linksCreated: z.number(),
+    error: z
+      .object({
+        invalidEdges: z.array(z.string()).optional(),
+        message: z.string().optional(),
+      })
+      .optional(),
+  }),
+})
+
+export const aiTools = [
+  boardContextDef,
+  boardCreateBlocksDef,
+  boardConnectBlocksDef,
+  boardEditBlocksDef,
+  boardCreateFilesDef,
+  boardMakeDiagramDef,
+]
 
 // Re-exported so the system prompt can reference tool names via constants.
 export const AI_TOOL_NAMES = {
   context: boardContextDef.name,
   createBlocks: boardCreateBlocksDef.name,
   connectBlocks: boardConnectBlocksDef.name,
+  editBlocks: boardEditBlocksDef.name,
+  createFiles: boardCreateFilesDef.name,
+  makeDiagram: boardMakeDiagramDef.name,
 } as const

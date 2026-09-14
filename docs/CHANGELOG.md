@@ -1,5 +1,64 @@
 # Changelog
 
+## 2026-09-11 — M17 (in progress): Block views — render how a block shows itself
+
+- **Views registry** (`src/lib/blocks/views.ts`): every block kind declares the
+  switchable ways it can render (purely presentational — a view only picks
+  which existing data is shown). A block stores its active view in `data.view`
+  and falls back to the kind's default (`resolveView` sanitizes bad values).
+- **File views** (`FileBlockData.view`, `FileCard.tsx`): `card` (default —
+  name/size/type + inline preview), `content` (media only — SVG/images render,
+  text scroll-capped, no header; metadata-only uploads show an oversized
+  emblem), and `meta` (compact chip). No schema/migration — existing rows
+  simply resolve `card`.
+- **View drives footprint** (`styles.css`): `content` sizes to the media up to
+  a cap (≈360×300), `meta` snaps to a small chip; ports and connection arrows
+  move with the block. No resize interaction needed.
+- **Right-click context menu** (`BlockShell.tsx`): placed file blocks open a
+  small view menu (active view checked, future-actions slot reserved) on
+  right-click; backdrop click or Escape closes it. Select/drag semantics
+  untouched. The menu renders via a portal to `document.body` so the canvas
+  pan/zoom transform can't displace it offscreen.
+- **Schema alignment** (`src/types/schemas.ts`): `FileBlockDataSchema` now
+  includes `content` and `view`, matching the TS type. react-db validates each
+  optimistic write against this schema, so without these keys the literal
+  bytes the view change writes would be rejected server-side and silently
+  rolled back — this round-trip is now pinned by tests.
+- **Tests**: `FileCard.test.tsx` (5 render-mode tests) + views-registry tests
+  + `BlockShell.test.tsx` (4 menu-interaction tests: opens on right-click,
+  default card checked, picks/commits a view and closes, text blocks left
+  alone) + schema acceptance tests; 130 total green.
+- Route (`index.tsx`) persists each switch via the existing undoable
+  `runRecorded`/`updateBlockData` path (`handleBlockViewChange`).
+- **Live smoke** (Postgres `data->>'view'` verified): created inline-SVG file
+  blocks, right-click → Content fills the shell to the media (360px cap, no
+  header), Meta snaps to a compact chip, choices survive a page reload, and
+  text blocks keep the browser's native menu.
+
+## 2026-09-11 — M16 (in progress): Ask, the builder
+
+- **`board_edit_blocks`** (`src/lib/ai/tools.ts` / `tools.server.ts`,
+  approval-gated): rewrite a text block's markdown, set field values on a
+  structured card (keyed by type field names, omitted fields preserved),
+  rename file blocks / file groups, and place or move blocks
+  (`upsertPlacement` added to `src/db/queries.server.ts`).
+- **Inline content files** (`FileBlockData.content`, `FileCard.tsx`,
+  `src/routes`): file blocks can now carry real content — markdown, JSON, CSV,
+  code, HTML, and SVG. The AI's `board_create_files` tool authors them
+  (`size` = UTF-8 byte length); SVG content renders as an image on the card,
+  other text renders as a monospace preview (truncated at 400 chars). Uploaded
+  files stay metadata-only. The AI snapshot exposes inline file content as the
+  block body so Ask can read and edit what's inside files.
+- **`board_make_diagram`** (`src/lib/ai/tools.server.ts`, approval-gated): one
+  call describes diagram nodes (indexed) + edges; the server creates text
+  blocks, lays them out with longest-path layering (`src/lib/ai/diagram.ts`,
+  unit-tested, left-to-right or top-to-bottom, anchored near existing placed
+  content), places them, and connects them with typed links (default
+  `depends-on`). AskPanel pans/selects the first created node into view after
+  approval (`onFocusBlock`).
+- **Ask persona updated** (`src/lib/ai/system.ts`): rule 3 now routes builder
+  intent to the right tool and prefers one batched call over many.
+
 ## 2026-09-10 — M15 (in progress): Ask, the AI assistant
 
 - **Ask panel** (`src/components/canvas/AskPanel.tsx`): a chat tab in the left

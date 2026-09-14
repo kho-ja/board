@@ -7,11 +7,15 @@ export const FieldValueSchema = z.union([
   z.null(),
 ])
 
+export const FileViewSchema = z.enum(['card', 'content', 'meta'])
+
 export const FileBlockDataSchema = z.object({
   kind: z.literal('file'),
   name: z.string(),
   size: z.number(),
   mimeType: z.string(),
+  content: z.string().optional(),
+  view: FileViewSchema.optional(),
 })
 
 export const FileGroupBlockDataSchema = z.object({
