@@ -1585,6 +1585,24 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
     [blocks, collections, runRecorded],
   )
 
+  // M17 — per-block render view (right-click menu): only the view field
+  // changes; everything else about the file stays untouched.
+  const handleBlockViewChange = useCallback(
+    (blockId: string, view: string) => {
+      const block = blocks.find((b) => b.id === blockId)
+      if (!block || block.kind !== 'file') return
+      const prevData = block.data as FileBlockData
+      const nextData: FileBlockData = { ...prevData, view: view as FileBlockData['view'] }
+      runRecorded(
+        'Change view',
+        () => void updateBlockData(collections, blockId, nextData),
+        () => void updateBlockData(collections, blockId, prevData),
+        () => void updateBlockData(collections, blockId, nextData),
+      )
+    },
+    [blocks, collections, runRecorded],
+  )
+
   const handleRenameGroup = useCallback(
     (blockId: string, name: string) => {
       const trimmed = name.trim()
@@ -1998,7 +2016,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           onOpenSchemaCreator={handleOpenSchemaCreator}
           onCreateInstance={handleCreateInstance}
           onDeleteType={handleDeleteType}
-          askPanel={<AskPanel />}
+          askPanel={<AskPanel onFocusBlock={focusBlock} />}
         />
         <div className="canvas-area">
           <Canvas
@@ -2047,6 +2065,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
                 livePosition={livePositions.get(block.id)}
                 members={membersByGroup.get(block.id)}
                 onGroupViewChange={handleGroupViewChange}
+                onBlockViewChange={handleBlockViewChange}
                 onMemberClick={selectOnly}
                 onDropFilesOnGroup={handleDropFilesOnGroup}
                 computeDropTarget={computeDropTarget}

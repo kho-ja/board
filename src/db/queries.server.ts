@@ -90,6 +90,18 @@ export async function updatePlacement(blockId: string, changes: Partial<Placemen
   return db.update(placements).set(rest).where(eq(placements.blockId, blockId)).returning()
 }
 
+/** Place a block, or move it if already placed (M16 — AI builder placement). */
+export async function upsertPlacement(values: PlacementInsert) {
+  return db
+    .insert(placements)
+    .values(values)
+    .onConflictDoUpdate({
+      target: placements.blockId,
+      set: { positionX: values.positionX, positionY: values.positionY },
+    })
+    .returning()
+}
+
 export async function deletePlacement(blockId: string) {
   return db.delete(placements).where(eq(placements.blockId, blockId)).returning()
 }

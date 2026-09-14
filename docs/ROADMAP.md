@@ -115,6 +115,29 @@ things are done before they are done.
   Tools: `board_context` (read-only snapshot of blocks/connections/types/
   memberships), `board_create_blocks` and `board_connect_blocks` (mutation,
   gated behind per-call user approval). Working tree, uncommitted.
+- **M16 — Ask, the builder (in progress):** the assistant edits and creates real
+  content instead of just talking:
+  - `board_edit_blocks` — rewrite text, set card field values, rename
+    files/groups, place or move blocks.
+  - `board_create_files` — author actual inline files on the board (markdown,
+    JSON, CSV, code, and SVG — which renders as an image) stored in the block's
+    `data`; file blocks gained optional `content` and a content preview.
+  - `board_make_diagram` — draw diagrams on the canvas in one approved call:
+    text blocks laid out with longest-path layering (left-to-right or
+    top-to-bottom) and connected with typed links; the client pans/selects the
+    result into view.
+  All mutations approval-gated. Working tree, uncommitted.
+- **M17 — Block views (in progress):** a block's rendering is a *projection it
+  can switch anytime*. Every kind registers its own view set
+  (`src/lib/blocks/views.ts`); a block keeps its active view in `data.view` and
+  falls back to the kind default. v1 ships **file** views only —
+  `card` (name + size + type + preview, today's default), `content` (the media
+  fills the card: SVG/image renders, text scrolls, no header), `meta` (compact
+  name + size + type chip). The view drives the block's footprint (content
+  sized to the media up to a cap; meta snaps to a chip); ports/links ride
+  along. Switching is a **right-click context menu** on placed file blocks
+  (menu also reserves a slot for future actions). Text, cards, groups, and the
+  left-dock asset rows unchanged in v1. Working tree, uncommitted.
 
 ## Next (in rough order)
 
