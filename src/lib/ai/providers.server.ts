@@ -25,9 +25,15 @@ export interface AiProviderInfo {
   available: boolean
   // whether the key comes from user config (DB) vs env
   userConfigured: boolean
+  // whether the master AI_ENCRYPTION_KEY is set (server truth — the client
+  // cannot read process.env, so this is reported through the provider query)
+  encryptionConfigured: boolean
 }
 
-const BUILTIN_PROVIDERS: readonly Omit<AiProviderInfo, 'available' | 'userConfigured'>[] = [
+const BUILTIN_PROVIDERS: readonly Omit<
+  AiProviderInfo,
+  'available' | 'userConfigured' | 'encryptionConfigured'
+>[] = [
   {
     id: 'openai',
     label: 'OpenAI',
@@ -123,10 +129,11 @@ async function getCustomBaseUrl(): Promise<string | undefined> {
 /** Called at request time so DB/env-driven `available` flags stay fresh. */
 export async function listAiProviders(): Promise<AiProviderInfo[]> {
   const providers: AiProviderInfo[] = []
+  const encryptionConfigured = Boolean(process.env.AI_ENCRYPTION_KEY)
 
   for (const p of BUILTIN_PROVIDERS) {
     const { available, userConfigured } = await checkProviderAvailable(p.id)
-    providers.push({ ...p, available, userConfigured })
+    providers.push({ ...p, available, userConfigured, encryptionConfigured })
   }
 
   const custom = customProviderConfig()
@@ -140,6 +147,7 @@ export async function listAiProviders(): Promise<AiProviderInfo[]> {
       configHint: 'AI_CUSTOM_BASE_URL',
       available,
       userConfigured,
+      encryptionConfigured,
     })
   }
 

@@ -189,11 +189,6 @@ export function messageText(message: UIMessage): string {
     .join(' ')
 }
 
-/** Searchable text for the whole thread. */
-export function threadText(messages: UIMessage[]): string {
-  return messages.map(messageText).join('\n')
-}
-
 export function threadTitle(messages: UIMessage[]): string {
   const firstUser = messages.find((m) => m.role === 'user')
   const text = firstUser ? messageText(firstUser).trim() : ''

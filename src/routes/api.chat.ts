@@ -23,7 +23,10 @@ async function providerFor(raw: Record<string, unknown>): Promise<{
     typeof raw.provider === 'string' ? (raw.provider as AiProviderId) : null
 
   let provider: AiProviderId | null = null
-  if (requested && (await isProviderAvailable(requested))) provider = requested
+  if (requested) {
+    const match = providers.find((p) => p.id === requested)
+    if (match?.available) provider = requested
+  }
 
   if (!provider) {
     const firstAvailable = providers.find((p) => p.available)
@@ -41,11 +44,6 @@ async function providerFor(raw: Record<string, unknown>): Promise<{
       : providers.find((p) => p.id === provider)?.defaultModel ?? ''
 
   return { provider, model }
-}
-
-async function isProviderAvailable(id: AiProviderId): Promise<boolean> {
-  const providers = await listAiProviders()
-  return providers.find((p) => p.id === id)?.available ?? false
 }
 
 export const Route = createFileRoute('/api/chat')({

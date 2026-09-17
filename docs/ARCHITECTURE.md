@@ -1,16 +1,18 @@
 # Architecture
 
-> Status: **M0–M3 implemented.** TanStack Start, the Postgres data path, the
-> pan/zoom/drag infinite canvas, and text-block rendering/editing are in place and
-> verified. M4 (file blocks + paste) is next per START_PLAN.md.
+> Status: **M0–M18 complete** — full v1 scope per START_PLAN.md. TanStack Start,
+> the Postgres data path, the pan/zoom/drag infinite canvas, text/file/group/object
+> blocks, views, typed connections + diagrams, and the Ask AI panel are all in place,
+> tested, and live-verified.
 
 ## Current state
 
 - TanStack Start scaffold (React 19, Vite via Start) with `src/routes/` file-based
   routing, TanStack Query + DB collections wired in the root provider.
 - M1 data path complete and verified: Postgres `kho_ja` DB with `blocks`,
-  `placements`, `memberships`, `types`, `views` tables; server-only Drizzle query
-  helpers (`src/db/queries.server.ts`); `createServerFn` wrappers
+  `placements`, `memberships`, `types`, `views`, `links`, `diagrams` tables;
+  server-only Drizzle query helpers (`src/db/queries.server.ts`) around the
+  singleton client (`src/db/client.ts`); `createServerFn` wrappers
   (`src/db/queries.functions.ts`); per-table QueryCollections
   (`src/collections/*`). Reading via `useLiveQuery`, mutations are optimistic and
   persist to Postgres on reload.
@@ -23,6 +25,12 @@
   `TextBlockView` renders through `@tanstack/markdown/react`; double-click opens the
   textarea editor; Enter persists through the blocks collection and Escape/blur
   cancels.
+- M4–M17 (files + paste, file groups, object schemas, views, typed connections,
+  diagrams, multi-select/multiboard ops, undo/redo, milestone hardening) complete;
+  M18 added durable **Ask chat history** (`src/lib/chat/history.ts`), a dedicated
+  Ask panel (`AIDrawer.tsx`) with an `AskSettings` dialog, and the AI **provider
+  + tool layer** (`src/lib/ai/*`, `src/routes/api.chat.ts`) that reads/writes real
+  board data through server tools.
 - The documentation is the source of truth for the roadmap: see ROADMAP.md (scope)
   and DECISIONS.md + DESIGN.md (decisions and the core knowledge-model design).
 
@@ -36,30 +44,30 @@
   control).
 - **Block model.** **Schema-driven, user-definable block types** (a type is a
   named set of fields; "object"/`file`/`file-group` are presets), with switchable
-  **views** (projections over a canonical shape). **v1 relationships** are simple
-  untyped "link with a line" plus hidden **group membership**; typed connections
-  are a future power feature. The detailed working design (options, trade-offs) is
-  in [DESIGN.md](./DESIGN.md).
+  **views** (projections over a canonical shape). **v1 relationships** shipped as
+  **typed, labeled connections** (`depends-on`, `responsible-for`, `part-of`,
+  `related-to`, `custom`) drawn on canvas, plus **group membership**. The detailed
+  working design (options, trade-offs) is in [DESIGN.md](./DESIGN.md).
 - **Monorepo** rooted at the repository root. The exact workspace flavor
   (pnpm workspaces vs. a single app with clean module separation) is an *open
   question* — see DECISIONS.md (OQ-6).
 - **Future-only** (not in v1): authentication, real-time multi-user collaboration,
-  ElectricSQL sync, indexed search, AI agents, a publishable npm package, typed
-  connections (see DECISIONS.md).
+  ElectricSQL sync, a publishable npm package (see DECISIONS.md).
 
 ## Stack (full-send TanStack, client + server + PostgreSQL)
 
 - **Client (React 19):** TanStack Router (file-based, single route for the board) +
   TanStack Query + **TanStack DB (QueryCollections)** as the reactive store —
-  `blocks`, `placements`, `memberships`, `types`, `views` collections with
-  `useLiveQuery` + optimistic mutations.
+  `blocks`, `placements`, `memberships`, `types`, `views`, `links`, `diagrams`
+  collections with `useLiveQuery` + optimistic mutations.
 - **Server (TanStack Start):** `createServerFn` server functions (SSR, Vinxi/Nitro).
   Server-only code in `.server.ts` / inside server functions; DB credentials never
-  reach the client.
+  reach the client. AI layer: `src/lib/ai/*` (provider registry, tools) +
+  `src/routes/api.chat.ts` stream proxy.
 - **DB:** Drizzle ORM + `pg` driver → **PostgreSQL** (local). Tables mirror the
-  collections: `blocks`, `placements`, `memberships`, `types`, `views`,
-  `schema_version`. QueryCollection binds client collections to server functions;
-  **no ElectricSQL** needed for v1.
+  collections: `blocks`, `placements`, `memberships`, `types`, `views`, `links`,
+  `diagrams`, each with a `schema_version` column. QueryCollection binds client
+  collections to server functions; **no ElectricSQL** needed for v1.
 - **Hot/cold perf split:** TanStack DB holds the cold model + derived live queries;
   the per-frame viewport transform / active drag stay in refs + `requestAnimationFrame`
   + direct DOM writes, committing back to the DB on drag-end.
@@ -74,13 +82,13 @@ BlockType  # user-definable (schema-driven) type: a named set of fields
   name, fields: Field[]
 Block      # an instance of a BlockType (custom, schema-driven) OR a default,
            # built-in type; one canonical block per thing
-  id, type, position (x, y), view, values: { [fieldName]: value },
-  placed: boolean        # derived: a row exists in the placements table
+  id, type, data (discriminated), position (x, y), schema_version,
+  placed: boolean          # a row exists in the placements table
 
-Link       # v1: a simple optional line between two blocks (untyped)
-  id, blockA, blockB
-Group      # e.g. File Group (file-only in v1): holds member references
-  membership stored under the hood (many-to-many)
+Link       # typed, labeled connection between two blocks
+  id, from, to, type (depends-on | responsible-for | part-of | related-to | custom)
+Diagram    # saved per-diagram snapshot of links
+Group      # e.g. File Group: holds member references (block <-> group membership)
 ```
 
 **Key structural rules (see DECISIONS.md):**
@@ -111,9 +119,6 @@ Group      # e.g. File Group (file-only in v1): holds member references
   become unplaced (see DECISIONS.md).
 - **Single board in v1**, but board/project is a first-class unit for later
   multi-project navigation.
-
-> Note: the earlier `Connection { source, target, type }` (typed, directed) is the
-> **future** model for queryable knowledge-graph traversal — deferred out of v1.
 
 
 ## External services

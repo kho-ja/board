@@ -47,7 +47,6 @@ interface BlockShellProps {
   tool?: Tool
   isConnecting?: boolean
   isConnectSource?: boolean
-  isConnectTarget?: boolean
   onConnectClick?: (blockId: string) => void
   onStartConnect?: (blockId: string, side: PortSide, screenPos: Vec) => void
   onDragMove?: (blockId: string, pos: Vec) => void
@@ -91,7 +90,6 @@ export function BlockShell({
   tool,
   isConnecting = false,
   isConnectSource = false,
-  isConnectTarget = false,
   onConnectClick,
   onStartConnect,
   onDragMove,
@@ -306,7 +304,7 @@ export function BlockShell({
     block.kind === 'file'
       ? (resolveView('file', storedView) ?? FILE_DEFAULT_VIEW)
       : undefined
-  const currentView = storedView ?? FILE_DEFAULT_VIEW
+  const currentView = fileView
 
   const onContextMenu = (e: React.MouseEvent) => {
     if (kindViews.length === 0) return
@@ -395,7 +393,7 @@ export function BlockShell({
   return (
     <div
       ref={elRef}
-      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}${isConnectSource ? ' is-connecting-source' : ''}${isConnectTarget ? ' is-connect-target' : ''}`}
+      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}${isConnectSource ? ' is-connecting-source' : ''}`}
       style={{ left: livePosition?.x ?? placement.positionX, top: livePosition?.y ?? placement.positionY }}
       data-block-id={block.id}
       onPointerDown={onPointerDown}

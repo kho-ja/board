@@ -14,6 +14,7 @@ export const listAiProvidersFn = createServerFn({ method: 'GET' }).handler(
       configHint: p.configHint,
       available: p.available,
       userConfigured: p.userConfigured,
+      encryptionConfigured: p.encryptionConfigured,
     }))
   },
 )

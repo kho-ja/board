@@ -12,6 +12,9 @@ import type { UIMessage } from '@tanstack/ai-client'
 
 import { listAiProvidersFn } from '#/lib/ai/providers.functions'
 import { AI_TOOL_NAMES, aiTools } from '#/lib/ai/tools'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ArrowLeft, Settings } from 'lucide-react'
 import { AskSettings } from './AskSettings'
 import { markdownComponents } from '#/lib/markdown/components'
 import {
@@ -382,27 +385,29 @@ function AskThread({
               {JSON.stringify(interrupt.originalArgs, null, 2)}
             </pre>
             <div className="ask-approval-actions">
-              <button
+              <Button
                 type="button"
-                className="ask-btn primary"
+                size="sm"
                 onClick={() => interrupt.resolveInterrupt(true)}
               >
                 Approve
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="ask-btn"
+                variant="outline"
+                size="sm"
                 onClick={() => interrupt.resolveInterrupt(false)}
               >
                 Deny
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="ask-btn ghost"
+                variant="ghost"
+                size="sm"
                 onClick={() => interrupt.cancel()}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ))}
@@ -419,9 +424,8 @@ function AskThread({
       </div>
 
       <form className="ask-composer" onSubmit={onSubmit}>
-        <input
+        <Input
           ref={inputRef}
-          className="ask-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
@@ -429,13 +433,13 @@ function AskThread({
           }
           disabled={!canSend}
         />
-        <button
+        <Button
           type="submit"
-          className="ask-send"
+          className="flex-none"
           disabled={!canSend || !input.trim() || resuming}
         >
           {resuming ? '…' : 'Send'}
-        </button>
+        </Button>
       </form>
     </>
   )
@@ -455,6 +459,7 @@ export function AskPanel({
   })
 
   const firstAvailable = providers.find((p) => p.available)
+  const encryptionConfigured = providers.some((p) => p.encryptionConfigured)
 
   const [providerId, setProviderId] = useState<string>(() => {
     const stored = localStorage.getItem(PROV_STORAGE)
@@ -497,22 +502,22 @@ export function AskPanel({
       if (!providers.some((p) => p.id === providerId && p.available)) {
         if (firstAvailable) {
           setProviderId(firstAvailable.id)
-          setModel(firstAvailable.defaultModel)
+          setModelValue(firstAvailable.defaultModel)
         }
       }
       return
     }
     if (firstAvailable) {
       setProviderId(firstAvailable.id)
-      setModel(firstAvailable.defaultModel)
+      setModelValue(firstAvailable.defaultModel)
     } else {
       const first = providers[0]
       if (first) {
         setProviderId(first.id)
-        setModel(first.defaultModel)
+        setModelValue(first.defaultModel)
       }
     }
-  }, [providers, providerId, firstAvailable])
+  }, [providers, providerId, firstAvailable, setModelValue])
 
   const activeProvider = providers.find((p) => p.id === providerId)
   const canSend = Boolean(activeProvider?.available && model.trim() && providers.length)
@@ -742,41 +747,34 @@ export function AskPanel({
         <>
           <div className="ask-chat-head">
             <div className="ask-chat-head-top">
-              <button
-                type="button"
-                className="ask-back"
-                onClick={() => setHome(true)}
-                aria-label="All chats"
-                title="All chats"
-              >
-                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-                  <path
-                    d="M10 3 5 8l5 5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <span className="ask-chat-title" title={activeThread?.title}>
-                {activeThread?.title ?? 'Chat'}
-              </span>
-              <button
-                type="button"
-                className="ask-settings-btn"
-                onClick={() => setSettingsOpen(true)}
-                title="Provider & model settings"
-                aria-label="Provider & model settings"
-              >
-                ⚙
-              </button>
+              <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setHome(true)}
+            aria-label="All chats"
+            title="All chats"
+          >
+            <ArrowLeft className="size-3.5" />
+          </Button>
+          <span className="ask-chat-title" title={activeThread?.title}>
+            {activeThread?.title ?? 'Chat'}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setSettingsOpen(true)}
+            title="Provider & model settings"
+            aria-label="Provider & model settings"
+          >
+            <Settings className="size-3.5" />
+          </Button>
             </div>
             <label className="ask-model-inline" title="Switch model">
               <span className="ask-model-inline-label">Model</span>
-              <input
-                className="ask-model-inline-input"
+              <Input
+                className="h-7 px-2 text-xs"
                 list="ask-model-options-header"
                 value={model}
                 onChange={(e) => setModelValue(e.target.value)}
@@ -811,6 +809,7 @@ export function AskPanel({
         model={model}
         onProviderChange={selectProvider}
         onModelChange={setModelValue}
+        encryptionConfigured={encryptionConfigured}
       />
     </div>
   )

@@ -1,8 +1,132 @@
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @theme {
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* shadcn/ui theme tokens, wired to the kho-ja board brand palette so shadcn
+   components (src/components/ui/*) look native alongside the hand-rolled
+   canvas UI. Dark values resolve the same brand vars flipped by
+   :root[data-theme="dark"] / the .dark class. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: var(--foam);
+  --foreground: var(--sea-ink);
+  --card: #ffffff;
+  --card-foreground: var(--sea-ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--sea-ink);
+  --primary: var(--lagoon);
+  --primary-foreground: #123037;
+  --secondary: var(--sand);
+  --secondary-foreground: var(--sea-ink);
+  --muted: var(--sand);
+  --muted-foreground: var(--sea-ink-soft);
+  --accent: color-mix(in oklab, var(--lagoon) 18%, transparent);
+  --accent-foreground: var(--sea-ink);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--lagoon);
+  --chart-1: #4fb8b2;
+  --chart-2: #328f97;
+  --chart-3: #c9932e;
+  --chart-4: #7d74c8;
+  --chart-5: #e06552;
+  --sidebar: var(--sand);
+  --sidebar-foreground: var(--sea-ink);
+  --sidebar-primary: var(--lagoon);
+  --sidebar-primary-foreground: #123037;
+  --sidebar-accent: color-mix(in oklab, var(--lagoon) 16%, transparent);
+  --sidebar-accent-foreground: var(--sea-ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--lagoon);
+}
+
+.dark {
+  --background: var(--foam);
+  --foreground: var(--sea-ink);
+  --card: var(--surface-strong);
+  --card-foreground: var(--sea-ink);
+  --popover: #15262b;
+  --popover-foreground: var(--sea-ink);
+  --primary: var(--lagoon);
+  --primary-foreground: #0f1a1e;
+  --secondary: var(--sand);
+  --secondary-foreground: var(--sea-ink);
+  --muted: var(--sand);
+  --muted-foreground: var(--sea-ink-soft);
+  --accent: color-mix(in oklab, var(--lagoon) 22%, transparent);
+  --accent-foreground: var(--sea-ink);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--lagoon);
+  --chart-1: #60d7cf;
+  --chart-2: #8de5db;
+  --chart-3: #e6b95c;
+  --chart-4: #a99ff0;
+  --chart-5: #ff8a75;
+  --sidebar: #0d191d;
+  --sidebar-foreground: var(--sea-ink);
+  --sidebar-primary: var(--lagoon);
+  --sidebar-primary-foreground: #0f1a1e;
+  --sidebar-accent: color-mix(in oklab, var(--lagoon) 20%, transparent);
+  --sidebar-accent-foreground: var(--sea-ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--lagoon);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 }
 
 :root {
@@ -2602,6 +2726,13 @@ a {
   color: #dc2626;
 }
 
+.asset-action-btn.asset-delete-btn.is-armed {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.2);
+  color: #dc2626;
+  font-weight: 600;
+}
+
 /* ---------- Milestone 9: v1 Relationships ("Link with a Line") ---------- */
 
 .canvas-viewport.tool-link {
@@ -2717,11 +2848,6 @@ a {
   box-shadow: 0 0 0 2px var(--lagoon) !important;
 }
 
-.block-shell.is-connect-target {
-  border-color: var(--lagoon-deep) !important;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 60%, transparent) !important;
-}
-
 
 .ask-panel {
   display: flex;
@@ -2760,28 +2886,6 @@ a {
 .ask-newchat:hover,
 .ask-history-toggle:hover {
   background: color-mix(in oklab, var(--lagoon) 26%, transparent);
-}
-
-/* M18 UI — toolbar gear that opens the Ask settings dialog */
-.ask-settings-btn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--sea-ink-soft);
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.ask-settings-btn:hover {
-  background: color-mix(in oklab, var(--lagoon) 18%, transparent);
-  color: var(--sea-ink);
 }
 
 .ask-newchat:disabled {
@@ -2983,41 +3087,6 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
-.ask-config-row {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.ask-label {
-  flex: none;
-  width: 3.4rem;
-  color: var(--sea-ink-soft);
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.ask-select,
-.ask-model-input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--chip-bg);
-  color: var(--sea-ink);
-  padding: 0.28rem 0.4rem;
-  font: inherit;
-  font-size: 0.72rem;
-}
-
-.ask-select:focus,
-.ask-model-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
-}
-
 .ask-thread {
   flex: 1;
   min-height: 0;
@@ -3211,32 +3280,6 @@ a {
   gap: 0.4rem;
 }
 
-.ask-btn {
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--chip-bg);
-  color: var(--sea-ink);
-  padding: 0.32rem 0.7rem;
-  font: inherit;
-  font-size: 0.7rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.ask-btn:hover {
-  border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
-}
-
-.ask-btn.primary {
-  background: var(--lagoon);
-  color: var(--foam);
-  border-color: var(--lagoon);
-}
-
-.ask-btn.ghost {
-  background: transparent;
-}
-
 .ask-resuming {
   color: var(--sea-ink-soft);
   font-size: 0.7rem;
@@ -3258,168 +3301,6 @@ a {
   gap: 0.4rem;
   padding: 0.5rem 0.6rem;
   border-top: 1px solid var(--line);
-}
-
-.ask-input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--chip-bg);
-  color: var(--sea-ink);
-  padding: 0.4rem 0.55rem;
-  font: inherit;
-  font-size: 0.75rem;
-}
-
-.ask-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
-}
-
-.ask-input:disabled {
-  opacity: 0.55;
-}
-
-.ask-send {
-  flex: none;
-  border: 0;
-  border-radius: 8px;
-  background: var(--lagoon);
-  color: var(--foam);
-  padding: 0.4rem 0.8rem;
-  font: inherit;
-  font-size: 0.74rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.ask-send:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-/* Ask Panel - API Keys Section */
-.ask-keys-section {
-  margin-top: 0.4rem;
-  padding-top: 0.4rem;
-  border-top: 1px solid var(--line);
-}
-
-.ask-keys-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  color: var(--sea-ink-soft);
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.2rem 0;
-}
-
-.ask-keys-badge {
-  min-width: 1.1rem;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--lagoon) 24%, transparent);
-  color: var(--lagoon-deep);
-  padding: 0.03rem 0.32rem;
-  font-size: 0.64rem;
-  font-weight: 700;
-  text-align: center;
-}
-
-.ask-keys-list {
-  margin-top: 0.4rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.ask-key-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.4rem;
-  border-radius: 7px;
-  background: color-mix(in oklab, var(--surface) 80%, transparent);
-}
-
-.ask-key-label {
-  flex: none;
-  width: 6.5rem;
-  color: var(--sea-ink);
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.ask-key-status {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex: 1;
-}
-
-.ask-key-configured {
-  color: var(--conn-part);
-  font-size: 0.66rem;
-  font-weight: 600;
-}
-
-.ask-key-edit {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex: 1;
-}
-
-.ask-key-input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--chip-bg);
-  color: var(--sea-ink);
-  padding: 0.28rem 0.4rem;
-  font: inherit;
-  font-size: 0.72rem;
-}
-
-.ask-key-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
-}
-
-.ask-base-url-input {
-  width: 12rem;
-}
-
-.ask-key-actions {
-  display: flex;
-  gap: 0.3rem;
-}
-
-.ask-btn-sm {
-  padding: 0.25rem 0.55rem;
-  font-size: 0.66rem;
-}
-
-.ask-btn-danger {
-  color: var(--danger);
-  border-color: color-mix(in oklab, var(--danger) 45%, var(--line));
-}
-
-.ask-btn-danger:hover {
-  background: color-mix(in oklab, var(--danger) 10%, var(--chip-bg));
-  border-color: var(--danger);
-}
-
-.ask-keys-note {
-  margin: 0.5rem 0 0;
-  color: var(--sea-ink-soft);
-  font-size: 0.62rem;
-  line-height: 1.4;
 }
 
 /* M18 UI — Ask "home" (chat list + search, the landing view) */
@@ -3511,25 +3392,6 @@ a {
   gap: 0.4rem;
 }
 
-.ask-back {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--sea-ink-soft);
-  cursor: pointer;
-}
-
-.ask-back:hover {
-  background: color-mix(in oklab, var(--lagoon) 18%, transparent);
-  color: var(--sea-ink);
-}
-
 .ask-chat-title {
   flex: 1;
   min-width: 0;
@@ -3554,146 +3416,5 @@ a {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.ask-model-inline-input {
-  flex: 1;
-  min-width: 0;
-  width: auto;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--chip-bg);
-  color: var(--sea-ink);
-  padding: 0.32rem 0.4rem;
-  font: inherit;
-  font-size: 0.7rem;
-}
-
-.ask-model-inline-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
-}
-
-/* M18 UI — Ask settings dialog: provider & model config, API keys */
-.ask-settings-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: rgba(23, 58, 64, 0.35);
-  backdrop-filter: blur(3px);
-}
-
-.ask-settings-dialog {
-  display: flex;
-  flex-direction: column;
-  width: min(560px, 100%);
-  max-height: min(84dvh, 680px);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface-strong);
-  box-shadow: 0 18px 60px rgba(23, 58, 64, 0.35);
-  overflow: hidden;
-}
-
-.ask-settings-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.ask-settings-title {
-  color: var(--sea-ink);
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.ask-settings-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.9rem 1rem;
-}
-
-/* M18 UI — stacked (label-above-control) rows inside the dialog so setting up
-   a new provider gets plenty of room. */
-.ask-settings-body .ask-config-row {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.3rem;
-}
-
-.ask-settings-body .ask-label {
-  width: auto;
-  margin: 0;
-}
-
-.ask-settings-body .ask-select,
-.ask-settings-body .ask-model-input {
-  padding: 0.45rem 0.55rem;
-  font-size: 0.78rem;
-}
-
-.ask-settings-body .ask-keys-section {
-  border-top: 1px solid var(--line);
-  padding-top: 0.6rem;
-}
-
-.ask-settings-body .ask-key-row {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.35rem;
-  padding: 0.55rem 0.6rem;
-}
-
-.ask-settings-body .ask-key-label {
-  width: auto;
-  font-size: 0.74rem;
-}
-
-.ask-settings-body .ask-key-edit {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.4rem;
-}
-
-.ask-settings-body .ask-key-input {
-  width: 100%;
-  padding: 0.42rem 0.5rem;
-  font-size: 0.78rem;
-}
-
-.ask-settings-body .ask-base-url-input {
-  width: 100%;
-}
-
-.ask-settings-body .ask-key-actions {
-  justify-content: flex-end;
-}
-
-.ask-settings-body .ask-key-status {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.ask-settings-footer {
-  flex: none;
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.4rem;
-  padding: 0.7rem 1rem;
-  border-top: 1px solid var(--line);
 }
 

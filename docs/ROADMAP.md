@@ -143,52 +143,35 @@ things are done before they are done.
   the menu portals to `document.body` so the canvas zoom transform can't
   displace it.
 
-## In progress
-
-- **M18 — Chat history & search (implemented, live-verified, uncommitted):**
-  the Ask panel grows real conversation history. Each thread is its own
-  `khoja.chat.<id>` persistence blob (client-authoritative localStorage, same
-  shape `useChat` already writes); a `khoja.chat.index` thread index (title,
-  created/lastMessage timestamps, message count) powers a history list in the
-  dock with "New chat", per-thread switch, and delete. A search box scans every
-  thread blob — case-insensitive, with the match `<mark>`-highlighted inside
-  each snippet — and a hit click resumes that conversation (results stay open
-  for jumping between matches). The legacy fixed `tanstack-ai:khoja-board-ask`
-  blob auto-migrates into a timeless thread on first run. Verified live:
-  migration, multi-thread create/switch/delete, cross-thread search hits,
-  highlight, reload persistence.
-- **M18 UI (follow-up, implemented, live-verified, uncommitted):** Ask moved
-  out of the Layers/Assets/Types dock into its own left panel (`AIDrawer.tsx`):
-  toggled by a "✦ I" button at the bottom of the tool rail or `Ctrl+I`, the
-  left bar *becomes* the Ask UI (the dock swaps out at the same 224px width so
-  the canvas never moves). Chat is durable per-thread in `khoja.chat.*` blobs
-  and restores on each open. The dock is back to a single 3-tab row.
-  Live-verified: swap in both directions with identical geometry, chat
-  restored, Ctrl+I / × close.
-- **M18 UI (follow-up, implemented, live-verified, uncommitted):** provider &
-  model configuration (including the API-key manager) moved out of the chat
-  panel into an `AskSettings` dialog opened from the panel's ⚙ gear.
-- **M18 UI (follow-up, implemented, live-verified, uncommitted):** the panel
-  now opens on a "Chats" home screen (search on top + list of conversations;
-  click to enter, × to delete). In-chat header has ← All chats, thread title,
-  an inline Model input (suggestions + free entry, applies instantly), and the
-  ⚙ settings gear.
+- **M18 — Chat history, dedicated Ask panel & settings (2026-09-14):** Ask
+  grows real conversation history (`src/lib/chat/history.ts`, 25 unit tests).
+  Each thread is its own `khoja.chat.<id>` persistence blob under a
+  `khoja.chat.index` + `khoja.chat.active` index; a search box scans every
+  thread blob, case-insensitive with `<mark>`-highlighted snippets, and a hit
+  click resumes that conversation; the legacy fixed `tanstack-ai:khoja-board-ask`
+  blob auto-migrates into a timeless thread on first run. Ask moved out of the
+  Layers/Assets/Types dock into its own left panel (`AIDrawer.tsx`, toggled by
+  a "✦ I" rail button or `Ctrl+I` at the same 224px width so the canvas never
+  moves), provider & model configuration (including the API-key manager) moved
+  into an `AskSettings` dialog, and the panel opens on a "Chats" home screen
+  (search + conversation list) whose per-chat header carries an inline Model
+  picker. Verified live: migration, multi-thread create/switch/delete,
+  cross-thread search + jump, reload persistence, panel/dock geometry swap,
+  Ctrl+I / × close.
 
 ## Next (in rough order)
 
 - **The v1 canvas scope from START_PLAN is complete.** The consciously deferred
-  power features remain — real-time collaboration, and AI agents that answer
-  questions about structured board data — along with hardening and the eventual
-  public package (product-first, package-later).
+  power features remain — real-time collaboration, and deeper AI that answers
+  questions about the board's *structured* data rather than only acting on it —
+  along with hardening and the eventual public package (product-first,
+  package-later).
 
 ## Future ideas (do not pretend these exist yet)
 
 - Authentication (login) — deferred deliberately; "anyone can use freely" was
   raised, but login is not a v1 requirement.
-- Backend + local PostgreSQL + persistence ("one board = one project").
 - Real-time collaboration (accepted as eventually desirable, "too hard" for now).
-- AI agents that answer questions about the project's real structured data and
-  generate/connect blocks.
 - A publishable npm package to build a community — extracted only *after* a
   stable, proven core exists (product-first, package-later).
 
