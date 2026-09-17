@@ -7,8 +7,6 @@ export default tseslint.config(
   {
     ignores: [
       'dist/**',
-      '.output/**',
-      '.vinxi/**',
       'node_modules/**',
       'src/routeTree.gen.ts',
     ],

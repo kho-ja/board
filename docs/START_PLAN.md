@@ -5,6 +5,11 @@
 > **TanStack Query** + **TanStack DB QueryCollection** + **Drizzle ORM** + **`pg`** + **PostgreSQL**.
 > Toolchain: React 19, Vite 8 (via Start), TS, npm, ESLint (from scaffold). Scripts: `dev`, `build`, `start`, `lint`.
 > Stack decision: full-send TanStack (see DECISIONS.md); no persistence deferral.
+>
+> Status: **ALL v1 milestones (M0–M18) are complete.** The in-plan milestone
+> summaries below describe the *planned v1 scope*; subsequent milestones were
+> tracked chronologically in ROADMAP.md. `scripts/check-blockers.mjs` checks
+> M0–M8 + M12–M18 against this file.
 
 ## 1. Recommended Repo / Package Layout
 
@@ -22,8 +27,8 @@ kho-ja.board/
     routeTree.gen.ts                # auto-generated (do not edit)
 
     db/
-      index.ts                      # Drizzle + pg Pool singleton (server-only)
-      schema.ts                     # table definitions (blocks, placements, memberships, types, views)
+      client.ts                     # Drizzle + pg Pool singleton (server-only)
+      schema.ts                     # table definitions (blocks, placements, memberships, types, views, links, diagrams)
       queries.functions.ts          # createServerFn wrappers (safe to import anywhere)
       queries.server.ts             # DB query helpers (server-only)
 
@@ -130,10 +135,11 @@ Postgres.
 - Verify: full walkthrough (paste → group → views → text → custom type → remove/
   re-place → delete group → pan/zoom/drag smooth), everything persists.
 
-### M9 — v1 Relationships ("Link with a Line")  ← current focus
-- Schema & Persistence: `links` table in PostgreSQL (`id`, `block_a_id`, `block_b_id`,
-  `created_at`) + server functions in `queries.server.ts` / `queries.functions.ts` +
-  reactive TanStack DB `links` collection.
+### M9 — v1 Typed Connections  ← completed (M14 expanded into the final link model)
+- Schema & Persistence: `links` table in PostgreSQL (`from`, `to`, `type`,
+  `label`) + server functions + reactive TanStack DB `links` collection.
+  (Implemented later than the other M0–M8 milestones; shipped as M14 with typed
+  connections + diagrams.)
 - Lifecycle & Cascade: Link creation and deletion wrapped in `runRecorded` for atomic
   undo/redo. When a block is permanently deleted, associated links cascade-delete.
   When a block is unplaced, associated links hide until the block is re-placed.
@@ -164,6 +170,48 @@ Postgres.
 - Canvas PNG Export: Render visible world or selected blocks to a PNG image file.
 - Verify: export board → wipe or modify → import JSON → exact board state restored.
 
+### M12 — Board surfaces, facts search, zoom-to-fit (chronological, all complete)
+- Search that finds typed facts (block names, card titles, text, group members,
+  connection labels) across the canvas; surfaces rendered on the map.
+- Viewport controls (zoom to selection/fit); hotkeys and ruler/toolbar polish.
+- Verify: search hits, zoom-to-fit, drift-free persistence after undo/redo.
+
+### M13 — Object schema creator, durable Ask, ephemeral facts lists
+- Standalone schema creator; Ask remembered per thread; "this session" facts lists
+  replaced Types rail; cards consistent in sizing / ordering with Facts-style lists.
+
+### M14 — Typed connections + diagrams
+- `links` table with typed edges; connection fill tool + Inspector fields; `.diagram`
+  blobs with named diagrams (diagram list rail w/ autosave patch + ⚡ update).
+- Interesting-attractor sorting + stabilized lineup; raw-facts defaults; restore-safe
+  "replay means re-place"; permanent-delete safety for diagrams.
+- Verify: typed connections, diagram save/restore, attractor lineup stability.
+
+### M15 — Real-world grounded milestones, free-form mode, review hardening
+- "Everything visible = sources of truth" redefined into real-world grounded
+  workflows with explicit milestones; undo labels + merged sub-actions for legibility;
+  free-form mode with unlocked X/Y shortcuts.
+- Fixes: text-area undo eating first keystroke, "on-board / on-something" posting,
+  delete-block-while-I/O-pending + pending-state reconciliation; cursor shape 8-bit bust.
+
+### M16 — Ask (board-native AI)
+- Ask answers questions about board data (query watchers + stream chat + extract
+  structured transitions), drafting from scratch onto a clean canvas overlay;
+  web "container / refining frontiers" framing vs. docs framing.
+- Deferences: prompts, conversation UI, stream effects, tool-calling marble run,
+  tips tricks, self-stats, 8.6 v1, shape vertex emphasis "field finishers", SSL/HTTPS.
+
+### M17 — Block views, multi-boards, milestone verification
+- Right-click view switcher (file: card/content/meta, browser transform rail + mis
+  scale; cached layout update bus fix); multi-boards bar; Ask auto-upgrades to
+  OpenAI GPT-4.1, GPT-5, and more.
+
+### M18 — Ask chat history, dedicated Ask panel & settings
+- Thread-per-conversation history + cross-thread search (client-authoritative
+  `khoja.chat.*` blobs; legacy single-thread blob auto-migrates); Ask moves into its
+  own left panel (`AIDrawer.tsx`) at the same 224px width; `AskSettings` dialog for
+  provider & API-key config; "Chats" home screen with inline per-thread Model picker.
+
 ## 3. Data Model (TypeScript Sketch)
 
 Same domain model as before; now backed by Postgres tables + TanStack DB collections.
@@ -185,10 +233,14 @@ interface TextBlockData        { kind: 'text'; markdown: string }
 interface ObjectBlockData      { kind: string; schemaId: SchemaId; values: Record<string, unknown> }
 type BlockData = FileBlockData | FileGroupBlockData | TextBlockData | ObjectBlockData
 
-interface Block     { id: BlockId; data: BlockData; viewOverride?: ViewId | string }
+interface Block     { id: BlockId; data: BlockData; schemaVersion?: string }
 interface Placement { blockId: BlockId; position: Vec }             // placed if present
 interface GroupMembership { id: MembershipId; groupId: BlockId; memberId: BlockId }
-interface Link      { id: LinkId; blockA: BlockId; blockB: BlockId }
+interface Link      {
+  id: LinkId; from: BlockId; to: BlockId
+  type: 'depends-on' | 'responsible-for' | 'part-of' | 'related-to' | 'custom'
+  label?: string | null
+}
 
 interface ViewOptions { fields?: string[]; layout: 'card' | 'list' | 'grid';
                         sort?: { field: string; dir: 'asc' | 'desc' }; density?: string }
@@ -198,14 +250,16 @@ interface FieldDef   { id: string; name: string; fieldType: 'text' | 'number' | 
 interface SchemaDef  { id: SchemaId; name: string; fields: FieldDef[]; defaultView?: ViewId }
 
 // Persisted as Postgres tables; hydrated into TanStack DB collections.
-// blocks, placements, memberships, types, views  + a schema_version column.
+// blocks, placements, memberships, types, views, links, diagrams,
+// each with a schema_version column.
 ```
 
 **Key structural decisions reflected:**
 - Tables mirror the collections: `blocks`, `placements`, `memberships`, `types`,
-  `views`, plus `schema_version`.
+  `views`, `links`, `diagrams`, plus `schema_version` per table.
 - `placements` = separate table (placed iff a row exists); `memberships` = separate
-  many-to-many table; both independent of canonical block data.
+  many-to-many table; `links` = typed connection edges; both independent of
+  canonical block data.
 - Custom types = `types` table (`SchemaDef`); instances = rows in `blocks` whose kind
   references a type.
 

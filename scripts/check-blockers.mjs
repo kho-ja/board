@@ -3,7 +3,7 @@
  * One-shot "is anything blocking the next milestone?" checker.
  *
  * Reads the canonical plan (docs/START_PLAN.md) and the other docs, then prints:
- *   - the ordered milestone list (M0..M8) with any done-markers found
+ *   - the ordered milestone list (M0..M18) with any done-markers found
  *   - the next milestone to implement (first not marked done)
  *   - any explicit blocker/blocked/BLOCK markers in docs/
  *   - the verification checklist to run for the next milestone
@@ -50,17 +50,18 @@ for (const ms of milestones) {
     `${ms.id}[\\s\\S]{0,120}?(complete|implemented|done|verified)`,
     'i',
   )
-  // Prefer the explicit header-level status: "### M0 ? Scaffold ... " plus the
-  // line "Status: ..." in ARCHITECTURE near "M<n> ... in place".
-  if (/Status:[\s\S]*M\d+ implemented/i.test(architecture)) {
-    // If ARCHITECTURE declares a blanket "M0?M3 implemented", mark M0..M3 done.
-    const blanket = architecture.match(/M(\d+)[—\-–]?M(\d+) implemented/i)
+  // Blanket header-level status in ARCHITECTURE, e.g. "Status: M0–M18 complete",
+  // covers a contiguous range of milestones.
+  if (/Status:[\s\S]*M\d+/.test(architecture)) {
+    const blanket = architecture.match(/M(\d+)[—–-]?\s*M(\d+)\s+(?:implemented|complete)/i)
     if (blanket) {
       const lo = parseInt(blanket[1], 10)
       const hi = parseInt(blanket[2], 10)
       const n = parseInt(ms.id.slice(1), 10)
-      if (n >= lo && n <= hi) done.add(ms.id)
-      continue
+      if (n >= lo && n <= hi) {
+        done.add(ms.id)
+        continue
+      }
     }
   }
   if (archHas && doneIndicators.test(architecture)) done.add(ms.id)

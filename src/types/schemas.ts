@@ -47,7 +47,6 @@ export const BlockSchema = z
     id: z.string(),
     kind: z.string(),
     data: BlockDataSchema,
-    viewOverride: z.string().nullable().optional(),
     schemaVersion: z.string().default('1'),
     createdAt: z.coerce.date().optional(),
     updatedAt: z.coerce.date().optional(),

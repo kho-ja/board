@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 
 import { ObjectEditPanel } from '#/blocks/object/ObjectEditPanel'
 import type { AlignMode, DistributeAxis } from '#/lib/canvas/layout'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   CONNECTION_TYPE_COLORS,
   CONNECTION_TYPE_LABELS,
@@ -279,18 +287,23 @@ function ConnectionTypeField({
       <label className="inspector-label" htmlFor={`conn-type-${linkId}`}>
         Type
       </label>
-      <select
-        id={`conn-type-${linkId}`}
-        className="inspector-input"
+      <Select
         value={type}
-        onChange={(e) => onUpdate(linkId, e.target.value as ConnectionType)}
+        onValueChange={(v) => {
+          if (v !== null) onUpdate(linkId, v as ConnectionType)
+        }}
       >
-        {CONNECTION_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {CONNECTION_TYPE_LABELS[t]}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id={`conn-type-${linkId}`} className="w-full">
+          <SelectValue placeholder="Choose a type" />
+        </SelectTrigger>
+        <SelectContent>
+          {CONNECTION_TYPES.map((t) => (
+            <SelectItem key={t} value={t}>
+              {CONNECTION_TYPE_LABELS[t]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <p className="inspector-hint">
         <span
           className="conn-type-dot"
@@ -331,7 +344,7 @@ function ConnectionLabelField({
       <label className="inspector-label" htmlFor={`conn-label-${linkId}`}>
         Label
       </label>
-      <input
+      <Input
         id={`conn-label-${linkId}`}
         className="inspector-input"
         placeholder="Optional note on the connection"
@@ -339,8 +352,9 @@ function ConnectionLabelField({
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
+          // Enter blurs; onBlur commits — exactly once (blur fired by Enter
+          // would otherwise commit twice against the stale `label` prop).
           if (e.key === 'Enter') {
-            commit()
             e.currentTarget.blur()
           }
         }}
@@ -443,8 +457,8 @@ function GroupPanel({
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
+          // Enter blurs; onBlur commits — exactly once.
           if (e.key === 'Enter') {
-            commit()
             e.currentTarget.blur()
           }
         }}

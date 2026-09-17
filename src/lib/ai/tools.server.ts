@@ -234,10 +234,14 @@ export const boardEditBlocks = boardEditBlocksDef.server(async ({ edits }) => {
       changed.push('name')
     }
 
-    const updated = await updateBlock(edit.id, { data, updatedAt: new Date() })
-    if (!updated[0]) {
-      results.push({ id: edit.id, ok: false, error: 'Update failed.' })
-      continue
+    // Only rewrite the block data when a field actually changed — a
+    // position-only edit shouldn't trigger a pointless UPDATE.
+    if (changed.length > 0) {
+      const updated = await updateBlock(edit.id, { data, updatedAt: new Date() })
+      if (!updated[0]) {
+        results.push({ id: edit.id, ok: false, error: 'Update failed.' })
+        continue
+      }
     }
 
     if (edit.position !== undefined) {
@@ -344,12 +348,18 @@ export const boardMakeDiagram = boardMakeDiagramDef.server(
       type?: ConnectionType
       label?: string | null
     }> = []
+    const seen = new Set<string>()
     for (const edge of edges) {
       const inRange = edge.from >= 0 && edge.from < nodes.length && edge.to >= 0 && edge.to < nodes.length
       if (!inRange || edge.from === edge.to) {
         invalidEdges.push(`${edge.from} -> ${edge.to}`)
         continue
       }
+      // Skip exact duplicates (same pair + same type) within one request so
+      // the model can't create duplicate links between freshly-made nodes.
+      const edgeKey = `${edge.from}|${edge.to}|${edge.type ?? 'depends-on'}`
+      if (seen.has(edgeKey)) continue
+      seen.add(edgeKey)
       validEdges.push({ from: edge.from, to: edge.to, type: edge.type, label: edge.label })
     }
 

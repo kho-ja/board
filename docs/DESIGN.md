@@ -27,12 +27,12 @@ by composing fields — this is the Notion-like "infinitely expandable" capabili
 ```text
 BlockType { name, fields: Field[] }      // user- or preset-defined
 Field     { name, fieldType }            // 'text' | 'number' | 'date' | 'boolean' | 'relation' | ...
-Block     = { id, type, position, view, values: { [fieldName]: value } }
+Block     = { id, type, data, placement: { x, y }, view }
 ```
 
 - Adding a type is a runtime data operation (define the schema), not a code change.
 - Rendering is driven by the schema (render whatever fields the type declares).
-- A `data` blob is replaced by typed field **values** validated against the schema.
+- A `data` blob is the block's canonical value, validated against the schema.
 
 ### "Object" is a preset, not a universal base
 
@@ -73,9 +73,10 @@ created from presets or from scratch as fields composed arbitrarily.
 
 ## 2. Connections / Relationships
 
-**Status:** v1 is **simple lines** + under-the-hood group membership. Typed,
-normalized connections are the **future** direction (see "Future: typed
-connections" below). See [DECISIONS.md](./DECISIONS.md).
+**Status:** Settled and shipped in v1. Typed, labeled connections
+(`depends-on`, `responsible-for`, `part-of`, `related-to`, `custom`) rendered as
+canvas lines with a fill tool, plus under-the-hood **group membership**. See
+[DECISIONS.md](./DECISIONS.md).
 
 ### The user mental model (settled by grilling)
 
@@ -83,43 +84,39 @@ Users do **not** think in terms of arrows or connection types. They think in ter
 of **folders, groups, and related items**. The relationship system is a transparent
 data layer underneath.
 
-### v1 model (settled)
+### v1 model (settled and implemented)
 
-- **"Link with a line"** is the only user-facing connection: you draw a simple line
-  between two blocks. No type, no arrowhead direction, no labels. It is an optional
-  utility for organization — a user may or may not use it; it is never required.
-- **Group membership** (e.g. a File Group holding files) is created by *pasting
-  files into a group*. Under the hood this is stored as a relationship (a `part-of`
-  edge), but the user never manages it as an arrow.
-- **Many-to-many:** a file can belong to more than one group (settled — see GRILL 23).
-
-```text
-// v1
-Link   { id, blockA, blockB }        // a simple drawn line (untyped, optional)
-Group  { ... }                        // holds members; membership stored as edges
-```
-
-### Future: typed connections (direction, NOT v1)
-
-The long-term value is a **queryable knowledge graph**: relationships carry meaning
-("Feature depends on API"), enabling search and AI traversal. When typed
-relationships ship (as an optional power feature, not the default UX), they use:
-
-- **v1 future connection type set:** `depends-on`, `responsible-for`, `part-of`,
-  `related-to`.
-- **Normalized direction** — one canonical direction per type, so the graph is
+- A connection is a **typed, laid-out line** between two blocks, with an optional
+  editable label. Types: `depends-on`, `responsible-for`, `part-of`, `related-to`,
+  and `custom`; the fill tool is the primary shortcut for drawing them. They are
+  optional utility — never required.
+- **Normalized direction** — one canonical direction per type, so the graph stays
   queryable regardless of how arrows were drawn.
 - **Cardinality:** many-to-many, multiple typed edges allowed between a pair;
   minimal optional edge data; `related-to` is the only symmetric type.
+- **Group membership** (e.g. a File Group holding files) is created by *pasting
+  files into a group*. Under the hood this is stored as a separate memberships
+  table (see GRILL 23) plus, since M14, diagram snapshots of connections
+  (a `diagrams` table).
+- **Many-to-many:** a file can belong to more than one group (settled — see GRILL 23).
 
-This section preserves the full analysis from the earlier grilling so it is not
-lost, even though it is consciously **deferred** out of v1.
+```text
+// v1 (implemented)
+Link   { id, from, to, type, label, ... }  // typed connection drawn on canvas
+Diagram { id, name, links, ... }            // saved diagram snapshot
+Group  { ... }                              // holds members; membership stored as edges
+```
+
+This section preserves the full analysis from the earlier grilling so the earlier
+"simple line, non-typed" option and the decision path are not lost.
 
 ---
 
 ## 3. Block Views
 
-**Status:** Sketching. Open question OQ-3 in DECISIONS.md.
+**Status:** Settled and shipped in v1 (File: card/content/meta + right-click menu;
+File Group: card/list; custom object types render their fields). See
+[DECISIONS.md](./DECISIONS.md).
 
 ### The question
 
@@ -158,8 +155,9 @@ Adopt the rule above for v1. Each block type defines **one canonical data shape*
 and a set of **views** that are projections over it. Multi-view is presentational;
 new field types are a data-model change handled at the type level.
 
-**Refinement to decide per type:** what views does each type ship with? Start with
-File (card view only) and File Group (card/list/grid) to validate the model.
+**Refinement to decide per type:** what views does each type ship with? v1 ships
+File (card/content/meta + right-click switcher) and File Group (card/list) to
+validate the model; custom object types render their fields.
 
 ---
 
@@ -174,23 +172,23 @@ Project
        └─ Block (instance of a user-defined BlockType at x,y)
             ├─ type   → which schema (BlockType)
             ├─ view   → projection of the canonical values
-            └─ values → the block's data for the type's fields
-       └─ Link       (optional simple line between two blocks)
+            └─ data   → the block's canonical data for the type
+       └─ Link       (typed connection drawn between two blocks)
        └─ Group      (e.g. File Group — holds members; rendered card/list)
 ```
 
 The board is a placeable surface; content persists independently (see the
-nodes-are-pointers decision). Relationships in v1 are simple lines + group
+nodes-are-pointers decision). Relationships in v1 are typed connections + group
 membership.
 
-### Future (typed knowledge graph — deferred, see DESIGN.md §2)
+### Future (typed knowledge graph — the long-term vision)
 
-The long-term vision: typed, directed Connections turn the board into a
-**queryable knowledge graph** — every brief diagram (Feature → API → Database →
-Table) is expressed as typed edges. That dual nature is what makes search (graph
-traversal + full-text) and AI (answering "which API is responsible for this
-feature?") possible later without restructuring. This is consciously **not** built
-in v1 (see DECISIONS.md).
+The board is already a **queryable knowledge graph**: every brief diagram
+(Feature → API → Database → Table) is expressed as typed edges. That dual nature
+is what makes deeper search (graph traversal + full-text) and AI traversal
+(answering "which API is responsible for this feature?") possible later without
+restructuring. Ask (M16/M18) already reads and mutates typed connections via
+server tools.
 
 ---
 

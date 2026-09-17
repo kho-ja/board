@@ -72,6 +72,7 @@ export function LeftDock({
   const tab = activeTab ?? internalTab
   const setTab = useCallback(
     (nextTab: Tab) => {
+      setArmedDeleteId(null)
       if (onTabChange) onTabChange(nextTab)
       else setInternalTab(nextTab)
     },
@@ -81,6 +82,30 @@ export function LeftDock({
   const [layersActive, setLayersActive] = useState(0)
   const [assetsActive, setAssetsActive] = useState(0)
   const [assetSort, setAssetSort] = useState<AssetSort>('category')
+  // Arm-then-confirm for permanent asset deletion (matches the Inspector —
+  // a permanent cascade delete should never happen on a single click/keystroke).
+  const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!armedDeleteId) return
+    const timer = setTimeout(() => setArmedDeleteId(null), 3000)
+    return () => clearTimeout(timer)
+  }, [armedDeleteId])
+
+  const handleAssetsActive = (index: number) => {
+    setArmedDeleteId(null)
+    setAssetsActive(index)
+  }
+
+  const requestDeleteAsset = (blockId: string) => {
+    if (!onDeleteAsset) return
+    if (armedDeleteId === blockId) {
+      onDeleteAsset(blockId)
+      setArmedDeleteId(null)
+    } else {
+      setArmedDeleteId(blockId)
+    }
+  }
 
   const cycleSort = () => {
     setAssetSort((current) => {
@@ -314,9 +339,9 @@ export function LeftDock({
             items={sortedUnplaced}
             getKey={(b: ObservableBlock) => b.id}
             activeIndex={assetsActive}
-            onActiveIndexChange={setAssetsActive}
+            onActiveIndexChange={handleAssetsActive}
             onAction={onPlaceAsset}
-            onDelete={onDeleteAsset}
+            onDelete={requestDeleteAsset}
             onCycleSort={cycleSort}
             selectedKeys={new Set()}
             label="Unplaced assets"
@@ -395,15 +420,19 @@ export function LeftDock({
                       {onDeleteAsset && (
                         <button
                           type="button"
-                          className="asset-action-btn asset-delete-btn"
+                          className={`asset-action-btn asset-delete-btn${armedDeleteId === block.id ? ' is-armed' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation()
-                            onDeleteAsset(block.id)
+                            requestDeleteAsset(block.id)
                           }}
-                          title="Delete asset permanently (Del)"
-                          aria-label={`Delete ${title} permanently`}
+                          title={
+                            armedDeleteId === block.id
+                              ? 'Click again to permanently delete'
+                              : 'Delete asset permanently (Del)'
+                          }
+                          aria-label={`${armedDeleteId === block.id ? 'Confirm deleting' : 'Delete'} ${title} permanently${armedDeleteId === block.id ? ' — click again' : ''}`}
                         >
-                          &times;
+                          {armedDeleteId === block.id ? 'Delete?' : '×'}
                         </button>
                       )}
                     </div>

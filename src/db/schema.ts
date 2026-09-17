@@ -15,7 +15,6 @@ export const blocks = pgTable('blocks', {
   kind: text().notNull(),
   // discriminated data blob: FileBlockData | FileGroupBlockData | TextBlockData | ObjectBlockData
   data: jsonb('data').$type<BlockData>().notNull(),
-  viewOverride: text('view_override'),
   schemaVersion: text('schema_version').notNull().default('1'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
