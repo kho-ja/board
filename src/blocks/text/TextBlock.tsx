@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Markdown } from '@tanstack/markdown/react'
 
 import { markdownComponents } from '#/lib/markdown/components'
+import { Textarea } from '@/components/ui/textarea'
 
 import type { TextBlockData } from '#/types'
 
@@ -43,9 +44,9 @@ export function TextBlockEditor({ data, onCommit, onCancel }: TextBlockEditorPro
   }
 
   return (
-    <textarea
+    <Textarea
       ref={textareaRef}
-      className="block-editor"
+      className="block-editor min-h-0 p-0 rounded-none border-0 bg-transparent field-sizing-none dark:bg-transparent"
       defaultValue={data.markdown}
       autoFocus
       onFocus={(e) => e.currentTarget.select()}

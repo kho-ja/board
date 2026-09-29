@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react'
 import { ObjectEditPanel } from '#/blocks/object/ObjectEditPanel'
 import type { AlignMode, DistributeAxis } from '#/lib/canvas/layout'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -114,13 +116,15 @@ export function Inspector({
           )}
           <div className="inspector-actions">
             {onDeleteLink && (
-              <button
+              <Button
                 type="button"
+                variant="destructive"
+                size="sm"
                 className="inspector-btn danger"
                 onClick={() => onDeleteLink(selectedLink.link.id)}
               >
                 Delete connection
-              </button>
+              </Button>
             )}
           </div>
         </aside>
@@ -163,8 +167,9 @@ export function Inspector({
             />
           )}
           {onUnplace && (
-            <button
+            <Button
               type="button"
+              size="sm"
               className="inspector-btn"
               onClick={() => {
                 for (const { block } of selected) {
@@ -173,7 +178,7 @@ export function Inspector({
               }}
             >
               Remove {selected.length} from board
-            </button>
+            </Button>
           )}
           {onDeleteBlocks && (
             <ConfirmDeleteMultiButton
@@ -250,13 +255,14 @@ export function Inspector({
 
       <div className="inspector-actions">
         {placement && onUnplace && (
-          <button
+          <Button
             type="button"
+            size="sm"
             className="inspector-btn"
             onClick={() => onUnplace(block.id)}
           >
             Remove from board
-          </button>
+          </Button>
         )}
         {isGroup && onDeleteGroup && (
           <ConfirmDeleteGroupButton groupId={block.id} onDeleteGroup={onDeleteGroup} />
@@ -297,12 +303,14 @@ function ConnectionTypeField({
           <SelectValue placeholder="Choose a type" />
         </SelectTrigger>
         <SelectContent>
-          {CONNECTION_TYPES.map((t) => (
-            <SelectItem key={t} value={t}>
-              {CONNECTION_TYPE_LABELS[t]}
-            </SelectItem>
-          ))}
-        </SelectContent>
+            <SelectGroup>
+              {CONNECTION_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {CONNECTION_TYPE_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
       </Select>
       <p className="inspector-hint">
         <span
@@ -384,36 +392,39 @@ function AlignPanel({
       {onAlign && (
         <div className="inspector-align-row" role="group" aria-label="Align selection">
           {alignButtons.map(({ mode, label, title }) => (
-            <button
+            <Button
               key={mode}
               type="button"
+              size="sm"
               className="inspector-btn inspector-align-btn"
               title={title}
               onClick={() => onAlign(mode)}
             >
               {label}
-            </button>
+            </Button>
           ))}
         </div>
       )}
       {onDistribute && (
         <div className="inspector-align-row" role="group" aria-label="Distribute selection">
-          <button
+          <Button
             type="button"
+            size="sm"
             className="inspector-btn inspector-align-btn"
             title="Space out evenly horizontally (needs 3+ blocks)"
             onClick={() => onDistribute('x')}
           >
             Distribute H
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             className="inspector-btn inspector-align-btn"
             title="Space out evenly vertically (needs 3+ blocks)"
             onClick={() => onDistribute('y')}
           >
             Distribute V
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -450,7 +461,7 @@ function GroupPanel({
       <label className="inspector-label" htmlFor={`group-name-${blockId}`}>
         Name
       </label>
-      <input
+      <Input
         id={`group-name-${blockId}`}
         className="inspector-input"
         value={value}
@@ -495,14 +506,16 @@ function ConfirmDeleteGroupButton({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant={armed ? 'destructive' : 'ghost'}
+      size="sm"
       className={`inspector-btn danger${armed ? ' is-armed' : ''}`}
       onClick={onClick}
       title="Delete this group. Files inside will be moved to the canvas."
     >
       {armed ? 'Click again to confirm delete' : 'Delete group'}
-    </button>
+    </Button>
   )
 }
 
@@ -533,14 +546,16 @@ function ConfirmDeleteBlockButton({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant={armed ? 'destructive' : 'ghost'}
+      size="sm"
       className={`inspector-btn danger${armed ? ' is-armed' : ''}`}
       onClick={onClick}
       title="Permanently delete this asset and its data."
     >
       {armed ? 'Click again to confirm delete' : `Delete ${kind}`}
-    </button>
+    </Button>
   )
 }
 
@@ -569,14 +584,16 @@ function ConfirmDeleteMultiButton({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant={armed ? 'destructive' : 'ghost'}
+      size="sm"
       className={`inspector-btn danger${armed ? ' is-armed' : ''}`}
       onClick={onClick}
       title="Permanently delete selected assets."
     >
       {armed ? 'Click again to confirm delete' : `Delete ${count} assets`}
-    </button>
+    </Button>
   )
 }
 
@@ -610,9 +627,10 @@ function PositionField({ blockId, placement, onCommit }: PositionFieldProps) {
     <div className="inspector-position">
       <label className="position-field">
         <span>X</span>
-        <input
+        <Input
           type="number"
           step="any"
+          className="inspector-pos-input"
           aria-label="X position"
           value={x}
           onInput={(e) => setX((e.target as HTMLInputElement).value)}
@@ -627,9 +645,10 @@ function PositionField({ blockId, placement, onCommit }: PositionFieldProps) {
       </label>
       <label className="position-field">
         <span>Y</span>
-        <input
+        <Input
           type="number"
           step="any"
+          className="inspector-pos-input"
           aria-label="Y position"
           value={y}
           onInput={(e) => setY((e.target as HTMLInputElement).value)}

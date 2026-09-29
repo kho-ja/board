@@ -1,6 +1,8 @@
 import { FILE_ICON } from '#/blocks/file/FileCard'
 import { formatBytes } from '#/blocks/file/FileCard'
 import type { ObservableBlock } from '#/components/canvas/BlockShell'
+import { Button } from '@/components/ui/button'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FileBlockData, FileGroupBlockData } from '#/types'
 
 const BLOCK_ID_MIME = 'application/x-khoja-block-id'
@@ -43,21 +45,30 @@ export function FileGroupBlock({
         <span className="file-group-name" title={data.name}>
           {data.name}
         </span>
-        <div className="view-selector" role="group" aria-label="View">
+        <ToggleGroup
+          className="view-selector"
+          spacing={0}
+          size="sm"
+          variant="outline"
+          value={[view]}
+          multiple={false}
+          onValueChange={(values) => {
+            const next = values[0]
+            if (next) onViewChange?.(next as 'card' | 'list')
+          }}
+        >
           {(['card', 'list'] as const).map((v) => (
-            <button
+            <ToggleGroupItem
               key={v}
-              type="button"
-              className={`view-selector-btn${view === v ? ' is-active' : ''}`}
+              value={v}
+              className="view-selector-btn"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => onViewChange?.(v)}
-              aria-pressed={view === v}
               title={`${v[0].toUpperCase()}${v.slice(1)} view`}
             >
               {v}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       <div className="file-group-body" data-view={view}>
@@ -112,9 +123,11 @@ function FileGroupMember({
   const data = member.data as FileBlockData
   return (
     <li>
-      <button
+      <Button
         type="button"
-        className="file-group-member"
+        variant="ghost"
+        size="sm"
+        className="file-group-member w-full justify-start"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => onMemberClick?.(member.id)}
         title={data.name}
@@ -128,7 +141,7 @@ function FileGroupMember({
         <span className="file-group-member-icon">{FILE_ICON}</span>
         <span className="file-group-member-name">{data.name}</span>
         {list && <span className="file-group-member-meta">{formatBytes(data.size)}</span>}
-      </button>
+      </Button>
     </li>
   )
 }

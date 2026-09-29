@@ -11,6 +11,10 @@ import { FileImport } from './FileImport'
 import { blockTitle } from './BlockRenderer'
 import type { ObservableBlock, ObservablePlacement } from './BlockShell'
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+
 export type Tab = 'layers' | 'assets' | 'types'
 
 export type AssetSort =
@@ -186,94 +190,36 @@ export function LeftDock({
 
   const tabsRef = useRef<HTMLDivElement>(null)
 
-  const onTabsKeyDown = (e: ReactKeyboardEvent) => {
-    const buttons = Array.from(
-      tabsRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
-    )
-    const current = document.activeElement as HTMLButtonElement | null
-    const idx = current ? buttons.indexOf(current) : -1
-    if (idx < 0 || buttons.length === 0) return
-    let next: number
-    switch (e.key) {
-      case 'ArrowRight':
-      case 'ArrowDown':
-        next = (idx + 1) % buttons.length
-        break
-      case 'ArrowLeft':
-      case 'ArrowUp':
-        next = (idx - 1 + buttons.length) % buttons.length
-        break
-      case 'Home':
-        next = 0
-        break
-      case 'End':
-        next = buttons.length - 1
-        break
-      default:
-        return
-    }
-    e.preventDefault()
-    buttons[next].focus()
-    buttons[next].click()
-  }
-
   return (
     <aside className="left-dock">
-      <div
-        className="dock-tabs"
-        role="tablist"
-        aria-label="Board views"
-        ref={tabsRef}
-        onKeyDown={onTabsKeyDown}
+      <Tabs
+        value={tab}
+        onValueChange={(next) => {
+          if (next) setTab(next as Tab)
+        }}
+        className="flex h-full flex-col"
       >
-        <button
-          type="button"
-          className={`dock-tab${tab === 'layers' ? ' is-active' : ''}`}
-          onClick={() => setTab('layers')}
-          role="tab"
-          id="dock-tab-layers"
-          aria-selected={tab === 'layers'}
-          aria-controls="dock-panel-layers"
-          tabIndex={tab === 'layers' ? 0 : -1}
+        <TabsList
+          className="dock-tabs"
+          aria-label="Board views"
+          ref={tabsRef}
         >
-          Layers
-          <span className="dock-count">{placed.length}</span>
-        </button>
-        <button
-          type="button"
-          className={`dock-tab${tab === 'assets' ? ' is-active' : ''}`}
-          onClick={() => setTab('assets')}
-          role="tab"
-          id="dock-tab-assets"
-          aria-selected={tab === 'assets'}
-          aria-controls="dock-panel-assets"
-          tabIndex={tab === 'assets' ? 0 : -1}
-        >
-          Assets
-          <span className="dock-count">{unplaced.length}</span>
-        </button>
-        <button
-          type="button"
-          className={`dock-tab${tab === 'types' ? ' is-active' : ''}`}
-          onClick={() => setTab('types')}
-          role="tab"
-          id="dock-tab-types"
-          aria-selected={tab === 'types'}
-          aria-controls="dock-panel-types"
-          tabIndex={tab === 'types' ? 0 : -1}
-        >
-          Types
-          <span className="dock-count">{types.length}</span>
-        </button>
-      </div>
+          <TabsTrigger value="layers" id="dock-tab-layers" className="dock-tab">
+            Layers
+            <span className="dock-count">{placed.length}</span>
+          </TabsTrigger>
+          <TabsTrigger value="assets" id="dock-tab-assets" className="dock-tab">
+            Assets
+            <span className="dock-count">{unplaced.length}</span>
+          </TabsTrigger>
+          <TabsTrigger value="types" id="dock-tab-types" className="dock-tab">
+            Types
+            <span className="dock-count">{types.length}</span>
+          </TabsTrigger>
+        </TabsList>
 
       <div className="dock-body">
-        <div
-          id="dock-panel-layers"
-          role="tabpanel"
-          aria-labelledby="dock-tab-layers"
-          hidden={tab !== 'layers'}
-        >
+        <TabsContent value="layers" id="dock-panel-layers">
           <NavList
             idPrefix="layer"
             items={placed}
@@ -298,32 +244,34 @@ export function LeftDock({
               </div>
             )}
           />
-        </div>
-        <div
-          id="dock-panel-assets"
-          role="tabpanel"
-          aria-labelledby="dock-tab-assets"
-          hidden={tab !== 'assets'}
-        >
+        </TabsContent>
+        <TabsContent value="assets" id="dock-panel-assets">
           <div className="dock-assets-toolbar">
             {unplaced.length > 0 && (
               <>
                 <label className="dock-sort-label" htmlFor="dock-asset-sort">
                   Sort <span className="dock-sort-hint">(S)</span>
                 </label>
-                <select
-                  id="dock-asset-sort"
-                  className="dock-sort-select"
+                <Select
                   value={assetSort}
-                  onChange={(e) => setAssetSort(e.target.value as AssetSort)}
+                  onValueChange={(v) => {
+                    if (v) setAssetSort(v as AssetSort)
+                  }}
                 >
-                  <option value="category">Category (Images, Docs, Notes...)</option>
-                  <option value="name-asc">Name (A &rarr; Z)</option>
-                  <option value="name-desc">Name (Z &rarr; A)</option>
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                  <option value="size">Size (Large &rarr; Small)</option>
-                </select>
+                  <SelectTrigger id="dock-asset-sort" className="dock-sort-select" size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="category">Category (Images, Docs, Notes...)</SelectItem>
+                      <SelectItem value="name-asc">Name (A &rarr; Z)</SelectItem>
+                      <SelectItem value="name-desc">Name (Z &rarr; A)</SelectItem>
+                      <SelectItem value="newest">Newest first</SelectItem>
+                      <SelectItem value="oldest">Oldest first</SelectItem>
+                      <SelectItem value="size">Size (Large &rarr; Small)</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </>
             )}
             {onPickFiles && (
@@ -404,8 +352,9 @@ export function LeftDock({
                     {sizeStr && <span className="asset-size">{sizeStr}</span>}
                     <div className="asset-actions">
                       {onPlaceAsset && (
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
                           className="asset-action-btn asset-place-btn"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -415,11 +364,13 @@ export function LeftDock({
                           aria-label={`Place ${title} on board`}
                         >
                           + Place
-                        </button>
+                        </Button>
                       )}
                       {onDeleteAsset && (
-                        <button
+                        <Button
                           type="button"
+                          variant={armedDeleteId === block.id ? 'destructive' : 'ghost'}
+                          size="sm"
                           className={`asset-action-btn asset-delete-btn${armedDeleteId === block.id ? ' is-armed' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -433,7 +384,7 @@ export function LeftDock({
                           aria-label={`${armedDeleteId === block.id ? 'Confirm deleting' : 'Delete'} ${title} permanently${armedDeleteId === block.id ? ' — click again' : ''}`}
                         >
                           {armedDeleteId === block.id ? 'Delete?' : '×'}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -441,36 +392,35 @@ export function LeftDock({
               )
             }}
           />
-        </div>
-        <div
-          id="dock-panel-types"
-          role="tabpanel"
-          aria-labelledby="dock-tab-types"
-          hidden={tab !== 'types'}
-        >
+        </TabsContent>
+        <TabsContent value="types" id="dock-panel-types">
           <div className="dock-types-header">
             <span className="dock-types-title">Custom Types</span>
             {onOpenSchemaCreator && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 className="dock-new-type-btn"
                 onClick={() => onOpenSchemaCreator()}
               >
                 + New Type
-              </button>
+              </Button>
             )}
           </div>
           {types.length === 0 ? (
             <div className="dock-empty">
               <p>No custom types yet.</p>
               {onOpenSchemaCreator && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   className="dock-empty-cta"
                   onClick={() => onOpenSchemaCreator()}
                 >
                   Create your first type
-                </button>
+                </Button>
               )}
             </div>
           ) : (
@@ -488,42 +438,48 @@ export function LeftDock({
                   </p>
                   <div className="dock-type-card-actions">
                     {onCreateInstance && (
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
                         className="dock-type-action-btn primary"
                         onClick={() => onCreateInstance(t.id)}
                         title={`Place a new ${t.name} on the board`}
                       >
                         + Add to board
-                      </button>
+                      </Button>
                     )}
                     {onOpenSchemaCreator && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         className="dock-type-action-btn"
                         onClick={() => onOpenSchemaCreator(t)}
                         title="Edit schema fields"
                       >
                         Edit
-                      </button>
+                      </Button>
                     )}
                     {onDeleteType && (
-                      <button
+                      <Button
                         type="button"
+                        variant="destructive"
+                        size="sm"
                         className="dock-type-action-btn danger"
                         onClick={() => onDeleteType(t.id)}
                         title="Delete type"
                       >
                         Delete
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </TabsContent>
       </div>
+      </Tabs>
     </aside>
   )
 }

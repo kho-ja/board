@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 
+import { Button } from '@/components/ui/button'
+
 /**
  * M18 UI — the AI assistant takes over the left panel in place of the
  * Layers/Assets/Types dock when toggled from the tool rail: the dock is not
@@ -23,15 +25,17 @@ export function AIDrawer({
           </span>
           Ask
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           className="ai-drawer-close"
           onClick={onClose}
           title="Back to layers"
           aria-label="Back to layers"
         >
           ×
-        </button>
+        </Button>
       </div>
       <div className="ai-drawer-body">{children}</div>
     </aside>

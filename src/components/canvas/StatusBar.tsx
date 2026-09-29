@@ -1,4 +1,5 @@
 import type { ViewportTransform } from '#/lib/canvas/transform'
+import { Button } from '@/components/ui/button'
 
 interface StatusBarProps {
   viewport: ViewportTransform
@@ -36,21 +37,23 @@ export function StatusBar({
         <kbd>V</kbd> Move &middot; <kbd>H</kbd> Hand &middot; <kbd>T</kbd> Text &middot; <kbd>C</kbd> Connect &middot; <kbd>A</kbd> Assets &middot; <kbd>Space</kbd> Pan &middot; <kbd>Del</kbd> Unplace &middot; <kbd>Ctrl+Z</kbd> Undo
       </span>
       <div className="zoom-cluster">
-        <button type="button" className="chrome-icon" onClick={onZoomOut} aria-label="Zoom out">
+        <Button type="button" variant="ghost" size="icon-sm" className="chrome-icon" onClick={onZoomOut} aria-label="Zoom out">
           &minus;
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           className="zoom-percent"
           onClick={onReset}
           title="Reset view"
           aria-label={`Zoom ${Math.round(viewport.scale * 100)} percent. Click to reset view.`}
         >
           {Math.round(viewport.scale * 100)}%
-        </button>
-        <button type="button" className="chrome-icon" onClick={onZoomIn} aria-label="Zoom in">
+        </Button>
+        <Button type="button" variant="ghost" size="icon-sm" className="chrome-icon" onClick={onZoomIn} aria-label="Zoom in">
           +
-        </button>
+        </Button>
       </div>
     </footer>
   )
