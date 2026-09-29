@@ -5,6 +5,9 @@ import type {
   ObjectBlockData,
   SchemaDef,
 } from '#/types'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 
 interface ObjectEditPanelProps {
   blockId: string
@@ -50,13 +53,15 @@ export function ObjectEditPanel({
       <div className="object-panel-header">
         <span className="object-type-badge">{schema?.name ?? data.kind}</span>
         {schema && onEditSchema && (
-          <button
+          <Button
             type="button"
+            size="sm"
+            variant="ghost"
             className="inspector-btn object-edit-schema-btn"
             onClick={() => onEditSchema(schema)}
           >
             Edit schema
-          </button>
+          </Button>
         )}
       </div>
 
@@ -77,7 +82,7 @@ export function ObjectEditPanel({
               </div>
 
               {field.fieldType === 'text' && (
-                <input
+                <Input
                   id={`obj-field-${blockId}-${field.id}`}
                   type="text"
                   className="inspector-input"
@@ -88,7 +93,7 @@ export function ObjectEditPanel({
               )}
 
               {field.fieldType === 'number' && (
-                <input
+                <Input
                   id={`obj-field-${blockId}-${field.id}`}
                   type="number"
                   className="inspector-input"
@@ -108,21 +113,27 @@ export function ObjectEditPanel({
               )}
 
               {field.fieldType === 'boolean' && (
-                <label className="object-checkbox-label">
-                  <input
+                <div className="object-checkbox-field">
+                  <Checkbox
                     id={`obj-field-${blockId}-${field.id}`}
-                    type="checkbox"
                     checked={!!rawVal}
-                    onChange={(e) =>
-                      handleFieldChange(field.id, e.target.checked)
+                    onCheckedChange={(checked) =>
+                      handleFieldChange(field.id, !!checked)
                     }
                   />
-                  <span>{rawVal ? 'Enabled / True' : 'Disabled / False'}</span>
-                </label>
+                  <label
+                    className="object-checkbox-label"
+                    htmlFor={`obj-field-${blockId}-${field.id}`}
+                  >
+                    <span>
+                      {rawVal ? 'Enabled / True' : 'Disabled / False'}
+                    </span>
+                  </label>
+                </div>
               )}
 
               {field.fieldType === 'date' && (
-                <input
+                <Input
                   id={`obj-field-${blockId}-${field.id}`}
                   type="date"
                   className="inspector-input"

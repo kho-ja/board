@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent } from 'react'
 
 import type { BlockData, FileBlockData, FileGroupBlockData, SchemaDef, Vec } from '#/types'
@@ -8,6 +7,16 @@ import type { PortSide } from '#/lib/canvas/geometry'
 import type { BlockViewDef } from '#/lib/blocks/views'
 import { FILE_DEFAULT_VIEW, resolveView, viewsForKind } from '#/lib/blocks/views'
 import { TextBlockEditor } from '#/blocks/text/TextBlock'
+
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuLabel,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 
 import { BlockRenderer } from './BlockRenderer'
 import { useViewport } from './ViewportProvider'
@@ -122,8 +131,6 @@ export function BlockShell({
   const [dragging, setDragging] = useState(false)
   const [editing, setEditing] = useState(false)
   const [dragTarget, setDragTarget] = useState(false)
-  // M17 — right-click view switcher (file blocks). `null` = menu closed.
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const dragDepthRef = useRef(0)
   const lastClientRef = useRef<Vec | null>(null)
   const dropTargetRef = useRef<DropTarget | null>(null)
@@ -133,16 +140,6 @@ export function BlockShell({
   const deferredCollapseRef = useRef(false)
 
   scaleRef.current = viewport.scale
-
-  // M17 — close the view menu on Escape or a second context click anywhere.
-  useEffect(() => {
-    if (!ctxMenu) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCtxMenu(null)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [ctxMenu])
 
   useEffect(() => {
     return () => {
@@ -306,15 +303,7 @@ export function BlockShell({
       : undefined
   const currentView = fileView
 
-  const onContextMenu = (e: React.MouseEvent) => {
-    if (kindViews.length === 0) return
-    e.preventDefault()
-    e.stopPropagation()
-    setCtxMenu({ x: e.clientX, y: e.clientY })
-  }
-
   const chooseView = (viewId: string, active: boolean) => {
-    setCtxMenu(null)
     if (!active && onBlockViewChange) onBlockViewChange(block.id, viewId)
   }
 
@@ -390,24 +379,27 @@ export function BlockShell({
     }
   }
 
-  return (
-    <div
-      ref={elRef}
-      className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}${isConnectSource ? ' is-connecting-source' : ''}`}
-      style={{ left: livePosition?.x ?? placement.positionX, top: livePosition?.y ?? placement.positionY }}
-      data-block-id={block.id}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={(e) => finishDrag(e, true)}
-      onPointerCancel={(e) => finishDrag(e, false)}
-      onDoubleClick={enterEdit}
-      title={blockHint}
-      onDragEnter={canReceiveDrop ? onGroupDragEnter : undefined}
-      onDragOver={canReceiveDrop ? onGroupDragOver : undefined}
-      onDragLeave={canReceiveDrop ? onGroupDragLeave : undefined}
-      onDrop={canReceiveDrop ? onGroupDrop : undefined}
-      data-view={fileView}
-      onContextMenu={onContextMenu}
+  const shell = (
+    <ContextMenuTrigger
+      render={
+        <div
+          ref={elRef}
+          className={`block-shell${isText ? ' is-text' : ''}${isGroup ? ' is-group' : ''}${isObject ? ' is-object' : ''}${dragging ? ' is-dragging' : ''}${editing ? ' is-editing' : ''}${selected ? ' is-selected' : ''}${dragTarget || isGroupDropTarget ? ' is-drop-target' : ''}${isConnectSource ? ' is-connecting-source' : ''}`}
+          style={{ left: livePosition?.x ?? placement.positionX, top: livePosition?.y ?? placement.positionY }}
+          data-block-id={block.id}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={(e) => finishDrag(e, true)}
+          onPointerCancel={(e) => finishDrag(e, false)}
+          onDoubleClick={enterEdit}
+          title={blockHint}
+          onDragEnter={canReceiveDrop ? onGroupDragEnter : undefined}
+          onDragOver={canReceiveDrop ? onGroupDragOver : undefined}
+          onDragLeave={canReceiveDrop ? onGroupDragLeave : undefined}
+          onDrop={canReceiveDrop ? onGroupDrop : undefined}
+          data-view={fileView}
+        />
+      }
     >
       {editing ? (
         <TextBlockEditor
@@ -464,59 +456,31 @@ export function BlockShell({
               onStartConnect?.(block.id, 'left', { x: e.clientX, y: e.clientY })
             }}
           />
-          {ctxMenu && kindViews.length > 0 &&
-            createPortal(
-              <>
-                <div
-                  className="block-ctx-backdrop"
-                  onPointerDown={(e) => {
-                    e.stopPropagation()
-                    setCtxMenu(null)
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setCtxMenu(null)
-                  }}
-                />
-                <div
-                  className="block-ctx-menu"
-                  role="menu"
-                  aria-label="Block view"
-                  style={{
-                    left: Math.min(ctxMenu.x, window.innerWidth - 190),
-                    top: Math.min(ctxMenu.y, window.innerHeight - 200),
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onContextMenu={(e) => e.preventDefault()}
-                >
-                  <p className="block-ctx-heading">View</p>
-                  {kindViews.map((v: BlockViewDef) => {
-                    const active = v.id === currentView
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={active}
-                        className={`block-ctx-item${active ? ' is-active' : ''}`}
-                        onClick={() => chooseView(v.id, active)}
-                      >
-                        <span className="block-ctx-check" aria-hidden="true">
-                          {active ? '✓' : ''}
-                        </span>
-                        {v.label}
-                      </button>
-                    )
-                  })}
-                  <hr className="block-ctx-divider" />
-                  <p className="block-ctx-muted">More actions coming soon</p>
-                </div>
-              </>,
-              document.body,
-            )}
         </>
       )}
-    </div>
+    </ContextMenuTrigger>
+  )
+
+  return (
+    <ContextMenu>
+      {shell}
+      {kindViews.length > 0 && (
+        <ContextMenuContent side="right" align="start" sideOffset={0} alignOffset={0}>
+            <ContextMenuRadioGroup
+              value={currentView ?? ''}
+              onValueChange={(viewId) => chooseView(viewId, viewId === currentView)}
+            >
+              <ContextMenuLabel>View</ContextMenuLabel>
+              {kindViews.map((v: BlockViewDef) => (
+                <ContextMenuRadioItem key={v.id} value={v.id} closeOnClick>
+                  {v.label}
+                </ContextMenuRadioItem>
+              ))}
+            </ContextMenuRadioGroup>
+            <ContextMenuSeparator />
+            <p className="px-1.5 py-1 text-xs text-muted-foreground">More actions coming soon</p>
+          </ContextMenuContent>
+      )}
+    </ContextMenu>
   )
 }

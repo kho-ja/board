@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   DEFAULT_SEARCH_LIMIT,
@@ -14,6 +14,16 @@ import type {
 } from '#/types'
 import type { ObservableBlock } from './BlockShell'
 import { blockTitle } from './BlockRenderer'
+import {
+  Command,
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandShortcut,
+} from '@/components/ui/command'
 
 function captionFor(block: ObservableBlock, types: readonly SchemaDef[]): string {
   const data = block.data
@@ -76,9 +86,6 @@ export function SearchOverlay({
   onSelect,
 }: SearchOverlayProps) {
   const [query, setQuery] = useState('')
-  const [activeIndex, setActiveIndex] = useState(0)
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const listRef = useRef<HTMLUListElement | null>(null)
 
   const items = useMemo<SearchableBlock[]>(
     () =>
@@ -97,105 +104,50 @@ export function SearchOverlay({
   )
 
   useEffect(() => {
-    if (open) {
-      setQuery('')
-      setActiveIndex(0)
-      requestAnimationFrame(() => inputRef.current?.focus())
-    }
+    if (open) setQuery('')
   }, [open])
 
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [query])
-
-  useEffect(() => {
-    const active = listRef.current?.children[activeIndex]
-    active?.scrollIntoView({ block: 'nearest' })
-  }, [activeIndex])
-
-  if (!open) return null
-
-  const commit = (blockId: string) => {
-    onSelect(blockId)
-  }
-
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      setActiveIndex((i) => Math.min(i + 1, results.length - 1))
-      return
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      setActiveIndex((i) => Math.max(i - 1, 0))
-      return
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      const result = results[activeIndex]
-      if (result) commit(result.blockId)
-    }
-  }
-
   return (
-    <div
-      className="search-overlay-backdrop"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+    <CommandDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose()
       }}
+      title="Search board"
+      description="Search blocks, text, fields, files…"
     >
-      <div className="search-palette" role="dialog" aria-label="Search board">
-        <div className="search-input-row">
-          <span className="search-icon" aria-hidden="true">
-            ⌘
-          </span>
-          <input
-            ref={inputRef}
-            className="search-input"
-            placeholder="Search blocks, text, fields, files…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onKeyDown}
-            spellCheck={false}
-            autoComplete="off"
-          />
-          <span className="search-kbd">esc</span>
-        </div>
-        <ul className="search-results" ref={listRef}>
+      <Command shouldFilter={false}>
+        <CommandInput
+          placeholder="Search blocks, text, fields, files…"
+          value={query}
+          onValueChange={setQuery}
+          spellCheck={false}
+          autoComplete="off"
+        />
+        <CommandList>
           {results.length === 0 ? (
-            <li className="search-empty">
-              {query.trim() ? 'No matches' : 'Type to search the board'}
-            </li>
+            <CommandEmpty>{query.trim() ? 'No matches' : 'Type to search the board'}</CommandEmpty>
           ) : (
-            results.map((result, index) => (
-              <li
-                key={result.blockId}
-                className={`search-item${index === activeIndex ? ' is-active' : ''}`}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => commit(result.blockId)}
-              >
-                <span className="search-item-title">
-                  <Highlighted text={result.title} query={query} />
-                </span>
-                <span className="search-item-caption">{result.caption}</span>
-                {unplacedBlockIds.has(result.blockId) && (
-                  <span className="search-item-badge">not placed</span>
-                )}
-              </li>
-            ))
+            <CommandGroup>
+              {results.map((result) => (
+                <CommandItem
+                  key={result.blockId}
+                  value={result.title}
+                  onSelect={() => onSelect(result.blockId)}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    <Highlighted text={result.title} query={query} />
+                  </span>
+                  <CommandShortcut>{result.caption}</CommandShortcut>
+                  {unplacedBlockIds.has(result.blockId) && (
+                    <span className="text-xs text-muted-foreground">not placed</span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
           )}
-        </ul>
-      </div>
-    </div>
+        </CommandList>
+      </Command>
+    </CommandDialog>
   )
 }

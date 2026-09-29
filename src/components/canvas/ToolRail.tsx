@@ -6,6 +6,8 @@ import {
 import type { ConnectionType } from '#/types'
 import { TOOLS } from './tools'
 import type { Tool } from './tools'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Button } from '@/components/ui/button'
 
 interface ToolRailProps {
   tool: Tool
@@ -75,50 +77,62 @@ export function ToolRail({
 }: ToolRailProps) {
   return (
     <nav className="tool-rail" aria-label="Tools">
-      {TOOLS.map(({ id, label, shortcut }) => (
-        <button
-          key={id}
-          type="button"
-          className={`tool-button${tool === id ? ' is-active' : ''}`}
-          onClick={() => onSelect(id)}
-          aria-label={`${label} (${shortcut})`}
-          aria-pressed={tool === id}
-          title={`${label} (${shortcut})`}
-        >
-          <ToolIcon tool={id} />
-          <span className="tool-shortcut" aria-hidden="true">
-            {shortcut}
-          </span>
-        </button>
-      ))}
+      <ToggleGroup
+        orientation="vertical"
+        value={[tool]}
+        multiple={false}
+        onValueChange={(values) => {
+          const next = values[0]
+          if (next) onSelect(next as Tool)
+        }}
+      >
+        {TOOLS.map(({ id, label, shortcut }) => (
+          <ToggleGroupItem
+            key={id}
+            value={id}
+            aria-label={`${label} (${shortcut})`}
+            title={`${label} (${shortcut})`}
+          >
+            <ToolIcon tool={id} />
+            <span className="tool-shortcut" aria-hidden="true">
+              {shortcut}
+            </span>
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
 
       {tool === 'link' && connectionType && onConnectionTypeChange && (
-        <div className="conn-type-picker" role="group" aria-label="Connection type">
+        <ToggleGroup
+          data-slot="conn-type-picker"
+          orientation="vertical"
+          value={[connectionType]}
+          multiple={false}
+          onValueChange={(values) => {
+            const next = values[0]
+            if (next) onConnectionTypeChange(next as ConnectionType)
+          }}
+          aria-label="Connection type"
+        >
           {CONNECTION_TYPES.map((type) => (
-            <button
-              key={type}
-              type="button"
-              className={`conn-type-chip${connectionType === type ? ' is-active' : ''}`}
-              onClick={() => onConnectionTypeChange(type)}
-              title={`Connect as ${CONNECTION_TYPE_LABELS[type]}`}
-              aria-pressed={connectionType === type}
-            >
+            <ToggleGroupItem key={type} value={type} title={`Connect as ${CONNECTION_TYPE_LABELS[type]}`}>
               <span
                 className="conn-type-dot"
                 style={{ background: CONNECTION_TYPE_COLORS[type] }}
                 aria-hidden="true"
               />
               {CONNECTION_TYPE_LABELS[type]}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       )}
 
       {onToggleAI && (
         <>
           <div className="tool-rail-spacer" aria-hidden="true" />
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             className={`tool-button ai-rail-button${aiOpen ? ' is-active' : ''}`}
             onClick={onToggleAI}
             aria-label="Ask — the AI assistant (Ctrl+I)"
@@ -128,10 +142,7 @@ export function ToolRail({
             <span className="tool-ai-glyph" aria-hidden="true">
               ✦
             </span>
-            <span className="tool-shortcut" aria-hidden="true">
-              I
-            </span>
-          </button>
+          </Button>
         </>
       )}
     </nav>

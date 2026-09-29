@@ -12,6 +12,7 @@ import type { UIMessage } from '@tanstack/ai-client'
 
 import { listAiProvidersFn } from '#/lib/ai/providers.functions'
 import { AI_TOOL_NAMES, aiTools } from '#/lib/ai/tools'
+import { AlertDialog } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Settings } from 'lucide-react'
@@ -272,14 +273,15 @@ function AskThread({
             {canSend && (
               <div className="ask-suggestions">
                 {SUGGESTIONS.map((s) => (
-                  <button
+                  <Button
                     key={s}
                     type="button"
+                    variant="outline"
                     className="ask-suggestion"
                     onClick={() => sendSuggestion(s)}
                   >
                     {s}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -287,13 +289,14 @@ function AskThread({
               <p className="ask-notconfigured">
                 {disabledReason}
                 {onOpenSettings && (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
                     className="ask-notconfigured-link"
                     onClick={onOpenSettings}
                   >
                     Open settings
-                  </button>
+                  </Button>
                 )}
               </p>
             )}
@@ -496,6 +499,7 @@ export function AskPanel({
   const [home, setHome] = useState(true)
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<ChatSearchHit[]>([])
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   useEffect(() => {
     if (providerId) {
@@ -611,27 +615,33 @@ export function AskPanel({
     setHome(false)
   }, [startNewChat])
 
-  const deleteThread = useCallback(
-    (id: string) => {
-      if (!window.confirm('Delete this chat and its history?')) return
-      try {
-        localStorage.removeItem(`${CHAT_PREFIX}${id}`)
-      } catch {
-        // best-effort
-      }
-      let next = threads.filter((t) => t.id !== id)
-      if (next.length === 0) next = [makeEmptyThread()]
-      next.sort((a, b) => b.lastMessageAt - a.lastMessageAt)
-      saveThreadIndex(next)
-      setThreads(next)
-      if (activeThreadId === id) {
-        const fallback = next[0]
-        saveActiveThreadId(fallback.id)
-        setActiveThreadId(fallback.id)
-      }
-    },
-    [threads, activeThreadId],
-  )
+const deleteThread = useCallback(
+  (id: string) => {
+    setDeleteTargetId(id)
+  },
+  [],
+)
+
+  const confirmDelete = useCallback(() => {
+    const id = deleteTargetId
+    if (!id) return
+    setDeleteTargetId(null)
+    try {
+      localStorage.removeItem(`${CHAT_PREFIX}${id}`)
+    } catch {
+      // best-effort
+    }
+    let next = threads.filter((t) => t.id !== id)
+    if (next.length === 0) next = [makeEmptyThread()]
+    next.sort((a, b) => b.lastMessageAt - a.lastMessageAt)
+    saveThreadIndex(next)
+    setThreads(next)
+    if (activeThreadId === id) {
+      const fallback = next[0]
+      saveActiveThreadId(fallback.id)
+      setActiveThreadId(fallback.id)
+    }
+  }, [deleteTargetId, threads, activeThreadId])
 
   // M18 — search across every thread blob, re-run as the index or query moves.
   useEffect(() => {
@@ -656,27 +666,29 @@ export function AskPanel({
         <div className="ask-home">
           <div className="ask-home-head">
             <span className="ask-home-title">Chats</span>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               className="ask-newchat"
               onClick={enterNewChat}
               title="Start a new chat"
             >
               <span aria-hidden="true">+</span> New chat
-            </button>
+            </Button>
           </div>
 
-          <input
-            type="search"
-            className="ask-search-input ask-search-main"
-            aria-label="Search past chats"
-            placeholder="Search past chats…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') clearSearch()
-            }}
-          />
+          <Input
+              type="search"
+              className="ask-search-input ask-search-main"
+              aria-label="Search past chats"
+              placeholder="Search past chats…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') clearSearch()
+              }}
+            />
 
           {query.trim() ? (
             <div className="ask-home-list ask-search-results">
@@ -686,7 +698,7 @@ export function AskPanel({
                 </p>
               ) : (
                 hits.map((hit, i) => (
-                  <button
+                  <Button
                     key={`${hit.threadId}:${hit.messageIndex}:${i}`}
                     type="button"
                     className={`ask-search-hit${
@@ -703,7 +715,7 @@ export function AskPanel({
                     <span className="ask-search-hit-meta">
                       {hit.role === 'user' ? 'You' : 'Ask'}
                     </span>
-                  </button>
+                  </Button>
                 ))
               )}
             </div>
@@ -716,7 +728,7 @@ export function AskPanel({
                     t.id === activeThreadId ? ' is-active' : ''
                   }`}
                 >
-                  <button
+                  <Button
                     type="button"
                     className="ask-history-main"
                     onClick={() => enterThread(t.id)}
@@ -728,16 +740,18 @@ export function AskPanel({
                         : `${t.messageCount} message${t.messageCount === 1 ? '' : 's'}`}{' '}
                       · {formatWhen(t.lastMessageAt)}
                     </span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     className="ask-history-del"
                     title="Delete chat"
                     aria-label={`Delete chat ${t.title}`}
                     onClick={() => deleteThread(t.id)}
                   >
                     ×
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -748,28 +762,28 @@ export function AskPanel({
           <div className="ask-chat-head">
             <div className="ask-chat-head-top">
               <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setHome(true)}
-            aria-label="All chats"
-            title="All chats"
-          >
-            <ArrowLeft className="size-3.5" />
-          </Button>
-          <span className="ask-chat-title" title={activeThread?.title}>
-            {activeThread?.title ?? 'Chat'}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setSettingsOpen(true)}
-            title="Provider & model settings"
-            aria-label="Provider & model settings"
-          >
-            <Settings className="size-3.5" />
-          </Button>
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setHome(true)}
+                aria-label="All chats"
+                title="All chats"
+              >
+                <ArrowLeft className="size-3.5" />
+              </Button>
+              <span className="ask-chat-title" title={activeThread?.title}>
+                {activeThread?.title ?? 'Chat'}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setSettingsOpen(true)}
+                title="Provider & model settings"
+                aria-label="Provider & model settings"
+              >
+                <Settings className="size-3.5" />
+              </Button>
             </div>
             <label className="ask-model-inline" title="Switch model">
               <span className="ask-model-inline-label">Model</span>
@@ -811,6 +825,28 @@ export function AskPanel({
         onModelChange={setModelValue}
         encryptionConfigured={encryptionConfigured}
       />
+
+      <AlertDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null)
+        }}
+      >
+        <AlertDialog.Content>
+          <AlertDialog.Header>
+            <AlertDialog.Title>Delete chat?</AlertDialog.Title>
+            <AlertDialog.Description>
+              This will permanently delete the chat and its messages.
+            </AlertDialog.Description>
+          </AlertDialog.Header>
+          <div className="flex justify-end gap-2">
+            <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+            <AlertDialog.Action onClick={confirmDelete}>
+              Delete
+            </AlertDialog.Action>
+          </div>
+        </AlertDialog.Content>
+      </AlertDialog>
     </div>
   )
 }

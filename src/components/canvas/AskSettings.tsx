@@ -113,7 +113,7 @@ export function AskSettings({
         </DialogHeader>
 
         <ScrollArea className="max-h-[55vh]">
-          <div className="space-y-4 px-4 py-2">
+          <div className="flex flex-col gap-4 px-4 py-2">
             <div className="grid gap-2">
               <Label htmlFor="ask-provider">Provider</Label>
               <Select
@@ -126,13 +126,15 @@ export function AskSettings({
                   <SelectValue placeholder="Choose a provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {providers.map((p) => (
-                    <SelectItem key={p.id} value={p.id} disabled={!p.available}>
-                      {p.label}
-                      {p.available ? '' : ' (not configured)'}
-                      {p.userConfigured ? ' ✓' : ''}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {providers.map((p) => (
+                      <SelectItem key={p.id} value={p.id} disabled={!p.available}>
+                        {p.label}
+                        {p.available ? '' : ' (not configured)'}
+                        {p.userConfigured ? ' ✓' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -156,7 +158,7 @@ export function AskSettings({
 
             <Separator />
 
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <p className="flex items-center gap-2 text-sm font-medium">
                 API Keys
                 {configuredCount > 0 && <Badge variant="outline">{configuredCount}</Badge>}
@@ -164,7 +166,7 @@ export function AskSettings({
               {providers
                 .filter((p) => p.id !== 'ollama')
                 .map((p) => (
-                  <div key={p.id} className="space-y-2">
+                  <div key={p.id} className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm">{p.label}</span>
                       {editingKey === p.id ? (
@@ -198,7 +200,7 @@ export function AskSettings({
                       )}
                     </div>
                     {editingKey === p.id && (
-                      <div className="space-y-2 rounded-lg border p-3">
+                      <div className="flex flex-col gap-2 rounded-lg border p-3">
                         <Input
                           type="password"
                           placeholder="Enter API key"

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 
 import { BlockShell } from '#/components/canvas/BlockShell'
 import { ViewportProvider } from '#/components/canvas/ViewportProvider'
@@ -62,14 +68,16 @@ describe('BlockShell view context menu (M17)', () => {
     expect(checked?.textContent).toContain('Card')
   })
 
-  it('reports the picked view and closes the menu', () => {
+  it('reports the picked view and closes the menu', async () => {
     const { shell, onBlockViewChange } = renderShell()
     fireEvent.contextMenu(shell, { clientX: 40, clientY: 40 })
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Meta/ }))
 
     expect(onBlockViewChange).toHaveBeenCalledTimes(1)
     expect(onBlockViewChange).toHaveBeenCalledWith('badge-1', 'meta')
-    expect(screen.queryByRole('menu')).toBeNull()
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).toBeNull()
+    })
   })
 
   it('does not fire on kinds without views and leaves the default context menu alone', () => {

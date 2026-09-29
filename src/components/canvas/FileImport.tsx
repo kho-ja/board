@@ -1,5 +1,7 @@
 import { useRef } from 'react'
 
+import { Button } from '@/components/ui/button'
+
 interface FileImportProps {
   onPick: (files: File[]) => void
   label?: string
@@ -15,20 +17,22 @@ interface FileImportProps {
 export function FileImport({
   onPick,
   label = 'Place files',
-  className = 'file-import-button',
+  className = 'group-create-button',
 }: FileImportProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         className={className}
         onClick={() => inputRef.current?.click()}
         title="Pick files to place on the board"
       >
         {label}
-      </button>
+      </Button>
       <input
         ref={inputRef}
         type="file"

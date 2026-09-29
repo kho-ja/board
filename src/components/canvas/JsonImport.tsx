@@ -1,5 +1,7 @@
 import { useRef } from 'react'
 
+import { Button } from '@/components/ui/button'
+
 interface JsonImportProps {
   onPick: (file: File) => void
   label?: string
@@ -20,14 +22,16 @@ export function JsonImport({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         className={className}
         onClick={() => inputRef.current?.click()}
         title="Import a board JSON file (replaces the current board, undoable)"
       >
         {label}
-      </button>
+      </Button>
       <input
         ref={inputRef}
         type="file"

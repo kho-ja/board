@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent, KeyboardEvent } from 'react'
+import type { FormEvent } from 'react'
 
 import type { FieldDef, FieldType, SchemaDef } from '#/types'
+
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Separator } from '@/components/ui/separator'
 
 interface SchemaCreatorProps {
   isOpen: boolean
@@ -50,8 +56,6 @@ export function SchemaCreator({
       setTimeout(() => nameInputRef.current?.focus(), 50)
     }
   }, [isOpen, schema])
-
-  if (!isOpen) return null
 
   const handleAddField = () => {
     setFields((prev) => [
@@ -113,151 +117,129 @@ export function SchemaCreator({
     onClose()
   }
 
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation()
-      onClose()
-    }
-  }
-
   return (
-    <div
-      className="schema-modal-backdrop"
-      onClick={onClose}
-      onKeyDown={onKeyDown}
-    >
-      <div
-        className="schema-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="schema-modal-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <form onSubmit={handleSubmit}>
-          <div className="schema-modal-header">
-            <h2 id="schema-modal-title" className="schema-modal-title">
-              {isEditing ? `Edit Type: ${schema?.name}` : 'New Object Type'}
-            </h2>
-            <button
-              type="button"
-              className="schema-modal-close"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              ×
-            </button>
+    <Dialog open={isOpen} onOpenChange={(next) => { if (!next) onClose() }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {isEditing ? `Edit Type: ${schema?.name}` : 'New Object Type'}
+          </DialogTitle>
+          <DialogDescription>
+            Define the fields for this object type. Each block will use these fields.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {error && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive" role="alert">
+              {error}
+            </div>
+          )}
+
+          <div className="flex w-full flex-col gap-2">
+            <label htmlFor="schema-type-name" className="text-sm font-medium">
+              Type Name
+            </label>
+            <Input
+              ref={nameInputRef}
+              id="schema-type-name"
+              type="text"
+              placeholder="e.g. Task, Person, Project, Bug"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
           </div>
 
-          <div className="schema-modal-body">
-            {error && <div className="schema-error-banner">{error}</div>}
+          <Separator />
 
-            <div className="schema-form-field">
-              <label htmlFor="schema-type-name" className="schema-label">
-                Type Name
-              </label>
-              <input
-                ref={nameInputRef}
-                id="schema-type-name"
-                type="text"
-                className="schema-input"
-                placeholder="e.g. Task, Person, Project, Bug"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
+          <div className="flex w-full flex-col gap-2">
+            <div className="flex w-full items-center justify-between gap-2">
+              <span className="text-sm font-medium">Fields ({fields.length})</span>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddField}>
+                + Add field
+              </Button>
             </div>
 
-            <div className="schema-fields-section">
-              <div className="schema-fields-header">
-                <span className="schema-label">Fields ({fields.length})</span>
-                <button
-                  type="button"
-                  className="schema-add-field-btn"
-                  onClick={handleAddField}
-                >
-                  + Add field
-                </button>
-              </div>
-
-              <div className="schema-fields-list">
-                {fields.map((field, idx) => (
-                  <div key={field.id} className="schema-field-row">
-                    <div className="schema-reorder-buttons">
-                      <button
-                        type="button"
-                        className="schema-reorder-btn"
-                        disabled={idx === 0}
-                        onClick={() => handleMoveField(idx, 'up')}
-                        title="Move up"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        className="schema-reorder-btn"
-                        disabled={idx === fields.length - 1}
-                        onClick={() => handleMoveField(idx, 'down')}
-                        title="Move down"
-                      >
-                        ▼
-                      </button>
-                    </div>
-
-                    <input
-                      type="text"
-                      className="schema-field-input"
-                      placeholder="Field name"
-                      value={field.name}
-                      onChange={(e) =>
-                        handleUpdateField(field.id, { name: e.target.value })
-                      }
-                    />
-
-                    <select
-                      className="schema-field-select"
-                      value={field.fieldType}
-                      onChange={(e) =>
-                        handleUpdateField(field.id, {
-                          fieldType: e.target.value as FieldType,
-                        })
-                      }
-                    >
-                      {FIELD_TYPES.map((t) => (
-                        <option key={t.type} value={t.type}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
+            <div className="flex w-full flex-col gap-2">
+              {fields.map((field, idx) => (
+                <div key={field.id} className="flex w-full items-center gap-1.5">
+                  <div className="inline-flex flex-col items-center">
+                    <Button
                       type="button"
-                      className="schema-remove-field-btn"
-                      onClick={() => handleRemoveField(field.id)}
-                      title="Remove field"
-                      aria-label={`Remove field ${field.name || 'unnamed'}`}
+                      variant="ghost"
+                      size="icon-xs"
+                      disabled={idx === 0}
+                      onClick={() => handleMoveField(idx, 'up')}
+                      title="Move up"
+                      aria-label={`Move field ${field.name || 'unnamed'} up`}
                     >
-                      ×
-                    </button>
+                      <span aria-hidden="true">▲</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      disabled={idx === fields.length - 1}
+                      onClick={() => handleMoveField(idx, 'down')}
+                      title="Move down"
+                      aria-label={`Move field ${field.name || 'unnamed'} down`}
+                    >
+                      <span aria-hidden="true">▼</span>
+                    </Button>
                   </div>
-                ))}
-              </div>
+
+                  <Input
+                    type="text"
+                    className="min-w-0 flex-1"
+                    placeholder="Field name"
+                    value={field.name}
+                    onChange={(e) =>
+                      handleUpdateField(field.id, { name: e.target.value })
+                    }
+                  />
+
+                  <NativeSelect
+                    className="w-40 shrink-0"
+                    value={field.fieldType}
+                    onChange={(e) =>
+                      handleUpdateField(field.id, {
+                        fieldType: e.target.value as FieldType,
+                      })
+                    }
+                  >
+                    {FIELD_TYPES.map((t) => (
+                      <option key={t.type} value={t.type}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => handleRemoveField(field.id)}
+                    title="Remove field"
+                    aria-label={`Remove field ${field.name || 'unnamed'}`}
+                  >
+                    <span aria-hidden="true">×</span>
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="schema-modal-footer">
-            <button
-              type="button"
-              className="schema-btn-cancel"
-              onClick={onClose}
-            >
+          <DialogFooter showCloseButton={false}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button type="submit" className="schema-btn-submit">
+            </Button>
+            <Button type="submit">
               {isEditing ? 'Save Changes' : 'Create Type'}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
