@@ -237,14 +237,15 @@ Plus in-browser: Gemini ran `board_context` (36 blocks · 31 connections ·
 1 type) and, after approval, created a block — `{"ok":true,"id":"3f0a55aa…",
 "kind":"text","title":"Gemini Probe"}`.
 
-`npx tsc --noEmit` clean · 177 tests pass (22 new) · `npm run build` succeeds.
+`npx tsc --noEmit` clean · `npm run build` succeeds.
 
-`npm run lint` remains blocked by a pre-existing repo-wide config issue, not by
-these changes:
-
-```
-Parsing error: No tsconfigRootDir was set, and multiple candidate TSConfigRootDirs are present
-```
+`npm run lint` was failing repo-wide with "No tsconfigRootDir was set, and
+multiple candidate TSConfigRootDirs are present" on every file. I had been
+writing this off as an unfixable pre-existing config problem. It was not: the
+error was `eslint .` recursing into `.delta/worktrees/1kn4z1nsawsf/board/`, a
+tool-managed worktree holding a full repo copy with its own `tsconfig.json`.
+Adding `.delta/**` to the ESLint `ignores` list (and `.gitignore`) fixed it.
+Lint now passes: 0 errors across 120 files.
 
 ### 8. The remembered "working" pair overrode explicit user choice
 
@@ -295,6 +296,9 @@ the answer will succeed.
   across visits; it is only dropped once a run actually errors. A time-based
   expiry (say, clear approvals older than N hours on hydrate) would be stricter
   but risks discarding a legitimate pause.
+- **No `.gitattributes`.** The repo is genuinely mixed (two files CRLF, the rest
+  LF), so editors and tooling keep flipping files and producing whole-file
+  rewrites in diffs. Worth settling deliberately rather than by accident.
 
 ## Verified this session
 
