@@ -491,15 +491,6 @@
     background: color-mix(in oklab, var(--lagoon) 22%, transparent);
   }
 
-  .ai-drawer-close {
-    @apply flex-none w-[1.6rem] h-[1.6rem] border-0 rounded-[7px] bg-transparent text-sea-ink-soft text-[1rem] leading-[1] cursor-pointer;
-  }
-
-  .ai-drawer-close:hover {
-    @apply text-danger;
-    background: color-mix(in oklab, var(--danger) 14%, transparent);
-  }
-
   .ai-drawer-body {
     @apply flex-1 min-h-0 flex flex-col;
   }
@@ -1418,38 +1409,12 @@
     @apply flex flex-col h-full min-h-0;
   }
 
-  /* M18 — thread toolbar + history + search */
-  .ask-newchat {
-    @apply flex-none inline-flex items-center gap-[0.3rem] border-0 rounded-[7px] text-sea-ink px-[0.5rem] py-[0.3rem] text-[0.7rem] font-bold cursor-pointer whitespace-nowrap;
-    background: color-mix(in oklab, var(--lagoon) 16%, transparent);
-    font: inherit;
-  }
-
-  .ask-newchat:hover {
-    background: color-mix(in oklab, var(--lagoon) 26%, transparent);
-  }
-
-  .ask-newchat:disabled {
-    @apply opacity-[0.45] cursor-default;
-  }
-
-  .ask-newchat span {
-    @apply text-[0.85rem] leading-none;
-  }
-
-  .ask-search-input {
-    @apply flex-1 min-w-0 border border-line rounded-[7px] bg-chip-bg text-sea-ink px-[0.5rem] py-[0.3rem] text-[0.72rem];
-    font: inherit;
-  }
-
-  .ask-search-input::placeholder {
-    @apply text-sea-ink-soft;
-  }
-
-  .ask-search-input:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
-  }
+  /* M18 — thread toolbar + history + search
+     NOTE: rules for elements that compose a shadcn primitive (`.ask-newchat`,
+     `.ask-search-main`, `.ask-search-hit`, `.ask-history-main`,
+     `.ask-history-del`, `.ask-notconfigured-link`, `.ask-suggestion`,
+     `.ask-error-retry`) live in `@layer brand-overrides` at the bottom of this
+     file, not here. See the explanation there. */
 
   .ask-search-results {
     @apply max-h-[12rem] overflow-auto border-b border-line;
@@ -1457,23 +1422,6 @@
 
   .ask-search-empty {
     @apply m-0 px-[0.6rem] py-[0.5rem] text-sea-ink-soft text-[0.74rem];
-  }
-
-  .ask-search-hit {
-    @apply flex flex-col items-stretch gap-[0.15rem] w-full border-0 border-b border-line bg-transparent text-sea-ink px-[0.6rem] py-[0.35rem] text-left cursor-pointer;
-    font: inherit;
-  }
-
-  .ask-search-hit:last-child {
-    @apply border-b-0;
-  }
-
-  .ask-search-hit:hover {
-    background: color-mix(in oklab, var(--lagoon) 14%, transparent);
-  }
-
-  .ask-search-hit.is-active {
-    background: color-mix(in oklab, var(--lagoon) 22%, transparent);
   }
 
   .ask-search-hit-title {
@@ -1506,26 +1454,12 @@
     background: color-mix(in oklab, var(--lagoon) 16%, transparent);
   }
 
-  .ask-history-main {
-    @apply flex-1 min-w-0 flex flex-col items-stretch gap-[0.15rem] border-0 bg-transparent text-sea-ink px-[0.55rem] py-[0.5rem] text-left cursor-pointer;
-    font: inherit;
-  }
-
   .ask-history-title {
     @apply text-[0.72rem] font-bold whitespace-nowrap overflow-hidden text-ellipsis;
   }
 
   .ask-history-meta {
     @apply text-sea-ink-soft text-[0.66rem] whitespace-nowrap overflow-hidden text-ellipsis;
-  }
-
-  .ask-history-del {
-    @apply flex-none border-0 rounded-[6px] bg-transparent text-sea-ink-soft w-[1.5rem] h-[1.5rem] mr-[0.35rem] text-[0.85rem] leading-none cursor-pointer;
-  }
-
-  .ask-history-del:hover {
-    @apply text-danger;
-    background: color-mix(in oklab, var(--danger) 18%, transparent);
   }
 
   .ask-thread {
@@ -1544,28 +1478,8 @@
     @apply text-danger;
   }
 
-  .ask-notconfigured-link {
-    @apply inline-flex mt-[0.15rem] p-0 border-0 text-lagoon-deep font-extrabold cursor-pointer underline;
-    background: none;
-    font: inherit;
-  }
-
-  .ask-notconfigured-link:hover {
-    @apply text-lagoon;
-  }
-
   .ask-suggestions {
     @apply flex flex-col gap-[0.35rem];
-  }
-
-  .ask-suggestion {
-    @apply border border-line rounded-[8px] bg-chip-bg text-sea-ink px-[0.55rem] py-[0.4rem] text-[0.7rem] text-left cursor-pointer;
-    font: inherit;
-  }
-
-  .ask-suggestion:hover {
-    border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
-    background: color-mix(in oklab, var(--lagoon) 10%, var(--chip-bg));
   }
 
   .ask-msg {
@@ -1653,29 +1567,20 @@
     @apply text-sea-ink-soft text-[0.7rem] italic;
   }
 
+  /* Message and recovery action on one row: the text wraps, the button keeps
+     its size. The button's own padding override lives in brand-overrides. */
   .ask-error {
     @apply rounded-[8px] text-danger px-[0.55rem] py-[0.45rem] text-[0.72rem] leading-[1.4];
-    border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--line));
-    background: color-mix(in oklab, var(--danger) 10%, var(--chip-bg));
-  }
-
-  /* Message and recovery action on one row: the text wraps, the button keeps
-     its size. shadcn `Button` ships fixed height + px utilities, so the brand
-     padding has to override them here rather than in @layer components. */
-  .ask-error {
     display: flex;
     align-items: flex-start;
     gap: 0.4rem;
+    border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--line));
+    background: color-mix(in oklab, var(--danger) 10%, var(--chip-bg));
   }
 
   .ask-error-text {
     @apply flex-1 min-w-0;
     overflow-wrap: anywhere;
-  }
-
-  .ask-error-retry {
-    @apply flex-none shrink-0 h-[1.5rem] px-[0.45rem] text-[0.68rem];
-    color: var(--danger);
   }
 
   .ask-composer {
@@ -1693,10 +1598,6 @@
 
   .ask-home-title {
     @apply text-sea-ink text-[0.8rem] font-extrabold tracking-[0.03em] uppercase;
-  }
-
-  .ask-search-main {
-    @apply flex-none mx-[0.6rem] mb-[0.45rem] px-[0.55rem] py-[0.38rem] text-[0.76rem];
   }
 
   .ask-home-list {
@@ -1775,24 +1676,44 @@
    in `@layer components`. */
 @layer brand-overrides {
   /* ---------- Ask assistant drawer ----------
-     The Ask panel swaps in for the left dock, so its controls must not inherit
-     shadcn primitive sizing: shadcn `Input` ships `w-full`, which made the
-     home-view search box 100% of the drawer *plus* its `mx-[0.6rem]`, pushing
-     10px past the panel's right edge and widening the drawer scroll box. */
+     Every rule below styles an element that composes a shadcn primitive, so all
+     of it has to live in this layer. Tailwind v4 emits its cascade as
+     `@layer theme, base, components, utilities`, and the primitives ship their
+     own look as *utilities* in JSX. Cascade layers are applied before
+     specificity, so a brand rule in `@layer components` loses to a plain
+     `text-sm` no matter how specific the selector -- it is dead on arrival.
 
-  /* Chat-list rows. The row is a card (`.ask-history-row` paints the surface and
-     the active tint), and the title/meta button plus the delete button sit side
-     by side inside it. shadcn `Button` defaults to `variant="default"`, which
-     ships `bg-primary` as a utility, so the title button rendered as a solid
-     teal block that swallowed the row's own background and stopped short of the
-     `x` -- making the delete button look like it was floating outside the card.
-     The `bg-transparent` declared for `.ask-history-main` in `@layer components`
-     could not win: utilities beat lower cascade layers regardless of
-     specificity. Flatten both the fill and the hover fill so the row stays one
-     continuous surface. */
-  .ask-history-main,
-  .ask-search-hit {
-    background: transparent;
+     Measured casualties before this was consolidated (intent -> actual):
+       .ask-newchat       border 0 -> 0.8px, radius 7px -> 8px, pad 8px -> 10px,
+                         11.2px -> 12.8px          (all beaten by `size="sm"`)
+       .ask-history-del   border 0 -> 0.8px, radius 6px -> 8px, 13.6px -> 14px
+       .ask-search-input  pad 8px -> 10px          (beaten by `Input` `px-2.5`)
+       .ask-history-main  solid teal `bg-primary` swallowed the row card
+       .ask-suggestion    493px wide on one line, 305px overflow in a 223px drawer
+
+     If a rule here stops working, check that the element is still a shadcn
+     primitive before adding specificity -- a higher-specificity rule in
+     `@layer components` will not help. */
+
+  /* ---- Chat list rows -------------------------------------------------
+     The row is a card (`.ask-history-row` paints the surface and the active
+     tint) and the title button plus the delete button sit side by side inside
+     it, so the buttons must not paint their own fill. */
+  .ask-history-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.15rem;
+    border: 0;
+    padding: 0.5rem 0.55rem;
+    text-align: left;
+    color: var(--sea-ink);
+    cursor: pointer;
+    font: inherit;
   }
 
   .ask-history-main:hover,
@@ -1800,13 +1721,121 @@
     background: transparent;
   }
 
-  /* Empty-chat suggestions.
-     shadcn `Button` ships `whitespace-nowrap` and a fixed `h-9` as utilities.
-     Neither can be undone from `@layer components`, so each suggestion stayed on
-     one line: the flex column sized to max-content (493px) inside a 223px
-     drawer, which dragged `.ask-empty` to 509px and gave `.ask-thread` a 305px
-     horizontal scroll. Let the labels wrap, drop the fixed height so wrapped
-     text is not clipped, and pin the column to the drawer's width. */
+  .ask-search-hit {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+    width: 100%;
+    height: auto;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0.35rem 0.6rem;
+    text-align: left;
+    color: var(--sea-ink);
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .ask-search-hit:hover {
+    background: color-mix(in oklab, var(--lagoon) 14%, transparent);
+  }
+
+  .ask-search-hit.is-active {
+    background: color-mix(in oklab, var(--lagoon) 22%, transparent);
+  }
+
+  .ask-search-hit:last-child {
+    border-bottom: 0;
+  }
+
+  .ask-history-del {
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.35rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--sea-ink-soft);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .ask-history-del:hover {
+    color: var(--danger);
+    background: color-mix(in oklab, var(--danger) 18%, transparent);
+  }
+
+  /* ---- Header "new chat" button ---- */
+  .ask-newchat {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 0;
+    border-radius: 7px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--sea-ink);
+    background: color-mix(in oklab, var(--lagoon) 16%, transparent);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .ask-newchat:hover {
+    background: color-mix(in oklab, var(--lagoon) 26%, transparent);
+  }
+
+  .ask-newchat:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .ask-newchat span {
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  /* ---- Home-view search box ----
+     shadcn `Input` ships `w-full`, which made the box 100% of the drawer plus
+     its own `mx`, pushing 10px past the right edge and widening the scroll
+     box; `px`/`py`/`text-[...]` are beaten by the primitive's own utilities.
+     The JSX applies `ask-search-main` alone, so it is one rule here -- split
+     across two classes, the later `flex` won and the box grew to fill the
+     panel. */
+  .ask-search-main {
+    flex: none;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    margin: 0 0.6rem 0.45rem;
+    padding: 0.38rem 0.55rem;
+    font-size: 0.76rem;
+    line-height: 1.3;
+    color: var(--sea-ink);
+    background: var(--chip-bg);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    font-family: inherit;
+  }
+
+  .ask-search-main::placeholder {
+    color: var(--sea-ink-soft);
+  }
+
+  .ask-search-main:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--lagoon) 45%, transparent);
+  }
+
+  /* ---- Empty-chat suggestions ----
+     shadcn `Button` ships `whitespace-nowrap` and a fixed `h-9`, so each chip
+     stayed on one line: the flex column sized to max-content (493px) inside a
+     223px drawer, dragging `.ask-empty` to 509px. */
   .ask-empty,
   .ask-suggestions {
     min-width: 0;
@@ -1814,25 +1843,62 @@
   }
 
   .ask-suggestion {
-    white-space: normal;
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    height: auto;
-    overflow-wrap: anywhere;
-    /* Two lines is enough to read in a 223px drawer; a third just makes the
-       empty state taller than the header and composer combined. The full text
-       stays reachable via the button's title. */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.7rem;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    color: var(--sea-ink);
+    background: var(--chip-bg);
+    cursor: pointer;
+    font-family: inherit;
   }
 
-  /* Model picker. Same trap as the search box above: shadcn `SelectTrigger`
-     ships `w-full`, which would push the header row past the drawer's right
-     edge. Lives here rather than in `@layer components` because the primitive's
-     own utilities beat any rule in a lower cascade layer. */
+  .ask-suggestion:hover {
+    border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
+    background: color-mix(in oklab, var(--lagoon) 10%, var(--chip-bg));
+  }
+
+  /* ---- "Configure a provider" link ---- */
+  .ask-notconfigured-link {
+    display: inline-flex;
+    margin-top: 0.15rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-weight: 800;
+    text-decoration: underline;
+    color: var(--lagoon-deep);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .ask-notconfigured-link:hover {
+    color: var(--lagoon);
+  }
+
+  /* ---- Error "Try again" button ---- */
+  .ask-error-retry {
+    flex: none;
+    height: 1.5rem;
+    padding: 0 0.45rem;
+    font-size: 0.68rem;
+    color: var(--danger);
+  }
+
+  /* ---- Model picker ----
+     shadcn `SelectTrigger` ships `w-full`, which would push the header row past
+     the drawer's right edge. */
   .ask-model-select {
     width: auto;
     min-width: 0;
@@ -1869,30 +1935,11 @@
     }
   }
 
-  .ask-search-main {
-    width: auto;
-    height: auto;
-    font-size: 0.76rem;
-    line-height: 1.3;
-    border-radius: 7px;
-  }
-
   /* shadcn Button pins `h-8` (32px), but the chat list rows are two-line
      (title + meta ≈ 34px) plus vertical padding, so flex-shrink squeezed each
      line to ~4px and `overflow-hidden` sliced the text in half. Same for the
-     search hits, which stack a title, snippet and badge. */
-  .ask-history-main,
-  .ask-search-hit {
-    height: auto;
-    flex: 1 1 auto;
-    /* shadcn Button's `items-center justify-center` utilities beat the
-       components-layer `items-stretch`, which made each child shrink-to-fit;
-       long chat titles then overflowed the row instead of ellipsizing and
-       gave the list a horizontal scrollbar. */
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-
+     search hits, which stack a title, snippet and badge. The child lines also
+     need `flex: none` or they shrink with the button. */
   .ask-history-title,
   .ask-history-meta,
   .ask-search-hit-title,
@@ -1901,15 +1948,26 @@
     line-height: 1.25;
   }
 
-  /* `size="icon-sm"` (28px) also overrides the 1.6rem brand control. */
+  /* ---- Drawer close (x) ----
+     `size="icon-sm"` (28px) also overrode the 1.6rem brand control, and the
+     `border-0` / `rounded-[7px]` / `text-[1rem]` were being beaten by the
+     primitive's own utilities -- the x rendered with a hairline border. */
   .ai-drawer-close {
+    flex: none;
     width: 1.6rem;
     height: 1.6rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--sea-ink-soft);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
   }
 
-  .ask-history-del {
-    width: 1.5rem;
-    height: 1.5rem;
+  .ai-drawer-close:hover {
+    color: var(--danger);
+    background: color-mix(in oklab, var(--danger) 14%, transparent);
   }
 
   /* ---------- shadcn Tabs.Root is `flex gap-2`; the dock owns its own vertical rhythm. */
