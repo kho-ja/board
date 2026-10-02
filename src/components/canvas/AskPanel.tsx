@@ -12,10 +12,25 @@ import type { UIMessage } from '@tanstack/ai-client'
 
 import { listAiProvidersFn } from '#/lib/ai/providers.functions'
 import { AI_TOOL_NAMES, aiTools } from '#/lib/ai/tools'
-import { AlertDialog } from '@/components/ui/alert-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Settings } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ArrowLeft, Plus, Settings } from 'lucide-react'
 import { AskSettings } from './AskSettings'
 import { markdownComponents } from '#/lib/markdown/components'
 import {
@@ -35,9 +50,13 @@ import {
 } from '#/lib/chat/history'
 
 import type { AiProviderInfo } from '#/lib/ai/providers.server'
-
-const PROV_STORAGE = 'khoja.ai.provider'
-const MODEL_STORAGE = 'khoja.ai.model'
+import {
+  markSelectionWorking,
+  modelsFor,
+  reconcileModel,
+  resolveInitialSelection,
+  writeSelection,
+} from '#/lib/ai/selection'
 
 const TOOL_LABELS: Record<string, string> = {
   [AI_TOOL_NAMES.context]: 'Read board snapshot',
@@ -53,6 +72,43 @@ const SUGGESTIONS = [
   'Summarize my notes.',
   'Create a block for "Things to follow up" and connect it to my other notes.',
 ]
+
+/**
+ * Renders an interrupt/run failure for the user.
+ *
+ * `interruptErrors` entries are plain `BatchInterruptError`/`ItemInterruptError`
+ * objects, not `Error` instances, so the previous `String(lastError)` fallback
+ * rendered a bare "[object Object]" -- shown even when the approved tool had
+ * already run successfully, which reads as a failure that never happened.
+ *
+ * The resume handshake reports `code: 'transport'` with a fixed message and no
+ * underlying cause. Left as-is it tells the user nothing actionable, so the
+ * common real cause (a rate-limited or unreachable provider) is spelled out.
+ */
+function describeFailure(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const { message, code } = error as {
+      message?: unknown
+      code?: unknown
+    }
+    if (typeof message === 'string' && message.trim()) {
+      const suffix =
+        typeof code === 'string' && code ? ` (${code})` : ''
+      const base = `${message}${suffix}`
+      if (code === 'transport') {
+        return `${base} The approved action may already have been applied — check the board before retrying.`
+      }
+      return base
+    }
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return 'Unknown error'
+    }
+  }
+  return String(error)
+}
 
 function summarizeToolCallOutput(name: string, parsed: unknown): string {
   if (
@@ -178,6 +234,7 @@ function AskThread({
   onFocusBlock,
   onConversationChanged,
   onOpenSettings,
+  onReplied,
 }: {
   threadId: string
   body: Record<string, unknown>
@@ -186,6 +243,7 @@ function AskThread({
   onFocusBlock?: (blockId: string) => void
   onConversationChanged: (messages: UIMessage[]) => void
   onOpenSettings?: () => void
+  onReplied?: () => void
 }) {
   const chat = useChat({
     threadId,
@@ -195,7 +253,9 @@ function AskThread({
     persistence: localStoragePersistence({ keyPrefix: CHAT_PREFIX }),
   })
 
-  const { messages, sendMessage, interrupts, resuming, interruptErrors } = chat
+  const { messages, sendMessage, interrupts, resuming, interruptErrors, error, reload } =
+    chat
+
   const approvalInterrupts = interrupts.filter(
     (i) =>
       (i as { kind?: string }).kind === 'tool-approval',
@@ -211,6 +271,30 @@ function AskThread({
   const [input, setInput] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  /**
+   * Drop approvals left over from a run that has already failed.
+   *
+   * A pending approval is persisted with the thread, so a run that dies between
+   * "tool needs approval" and the resume (a provider 429, a dropped connection)
+   * leaves a card behind on every later visit. The server holds no state for that
+   * run, so the card is a dead end: answering it just re-fails. Clearing it and
+   * leaving the error plus "Try again" gives one honest way forward instead of a
+   * button that appears live and cannot succeed.
+   *
+   * Guarded by a ref so the effect runs once per failed run rather than on every
+   * render while the error is still set.
+   */
+  const expiredRun = useRef<string | null>(null)
+  useEffect(() => {
+    if (!error || approvalInterrupts.length === 0) {
+      if (!error) expiredRun.current = null
+      return
+    }
+    if (expiredRun.current === error.message) return
+    expiredRun.current = error.message
+    for (const interrupt of approvalInterrupts) interrupt.cancel()
+  }, [error, approvalInterrupts])
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight })
@@ -236,9 +320,20 @@ function AskThread({
     void sendMessage(text)
   }
 
-  const lastError = interruptErrors.length
+  /**
+   * Two different failures can land here.
+   *
+   * `error` is the run-level failure from the stream, so it carries the real
+   * reason — a provider 429, a 404 for an unknown model, a 402. `interruptErrors`
+   * only covers the resume handshake and reports a generic
+   * "Interrupt continuation could not be started. (transport)", which on its own
+   * hides the actual cause (e.g. a rate-limited provider during resume).
+   *
+   * Prefer the run error when present so the user sees the actionable message.
+   */
+  const lastError = error ?? (interruptErrors.length
     ? interruptErrors[interruptErrors.length - 1]
-    : null
+    : null)
 
   // M16 — after an approved diagram run, pan/select the first created node so
   // the freshly-drawn diagram is immediately in view.
@@ -263,6 +358,28 @@ function AskThread({
     if (firstCreatedId) onFocusBlock(firstCreatedId)
   }, [messages, onFocusBlock])
 
+  /**
+   * A provider/model pair counts as "working" only once it has actually produced
+   * assistant output. Fire-and-forget so it cannot delay the first paint.
+   */
+  const reportedReply = useRef<string>('')
+  useEffect(() => {
+    if (!onReplied) return
+    const latest = messages[messages.length - 1]
+    if (!latest || latest.role !== 'assistant') return
+    const hasOutput = latest.parts.some((part) => {
+      if (part.type === 'text') return Boolean(part.content?.trim())
+      return (
+        part.type === 'tool-call' || part.type === 'tool-result'
+      )
+    })
+    if (!hasOutput) return
+    const signature = `${threadId}:${latest.id}`
+    if (reportedReply.current === signature) return
+    reportedReply.current = signature
+    onReplied()
+  }, [messages, onReplied, threadId])
+
   return (
     <>
       <div className="ask-thread" ref={threadRef}>
@@ -279,6 +396,7 @@ function AskThread({
                     variant="outline"
                     className="ask-suggestion"
                     onClick={() => sendSuggestion(s)}
+                    title={s}
                   >
                     {s}
                   </Button>
@@ -418,10 +536,22 @@ function AskThread({
         {resuming && <div className="ask-resuming">Working…</div>}
 
         {lastError && (
-          <div className="ask-error">
-            {lastError instanceof Error
-              ? lastError.message
-              : String(lastError)}
+          <div className="ask-error" role="alert">
+            <span className="ask-error-text">{describeFailure(lastError)}</span>
+            {/* A failed run leaves no way back otherwise, and a stale pending
+                approval in particular cannot be cleared from here. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="ask-error-retry"
+              onClick={() => {
+                void reload()
+                inputRef.current?.focus()
+              }}
+            >
+              Try again
+            </Button>
           </div>
         )}
       </div>
@@ -432,7 +562,9 @@ function AskThread({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
-            canSend ? 'Ask about your board…' : 'Open Ask settings to configure a provider'
+            // Kept short: the composer input is ~140px wide in the 224px drawer
+            // and clipped "Ask about your board…" mid-word.
+            canSend ? 'Ask your board…' : 'Configure a provider'
           }
           disabled={!canSend}
         />
@@ -461,21 +593,23 @@ export function AskPanel({
     staleTime: 60_000,
   })
 
-  const firstAvailable = providers.find((p) => p.available)
   const encryptionConfigured = providers.some((p) => p.encryptionConfigured)
 
-  const [providerId, setProviderId] = useState<string>(() => {
-    const stored = localStorage.getItem(PROV_STORAGE)
-    return stored ?? ''
-  })
-  const [model, setModel] = useState<string>(
-    () => localStorage.getItem(MODEL_STORAGE) ?? '',
-  )
+  const [providerId, setProviderId] = useState<string>('')
+  const [model, setModel] = useState<string>('')
 
-  const setModelValue = useCallback((value: string) => {
-    setModel(value)
-    localStorage.setItem(MODEL_STORAGE, value)
-  }, [])
+  /**
+   * Provider and model are persisted as one atomic pair and validated against
+   * the live provider list, so a reload can never restore a model the chosen
+   * provider does not offer.
+   */
+  const setModelValue = useCallback(
+    (value: string) => {
+      setModel(value)
+      writeSelection({ provider: providerId, model: value })
+    },
+    [providerId],
+  )
 
   // M18 UI — provider/model live in a settings dialog, not the chat panel.
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -501,47 +635,60 @@ export function AskPanel({
   const [hits, setHits] = useState<ChatSearchHit[]>([])
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
+  // Providers arrive asynchronously, so the stored pair is resolved as soon as
+  // the list lands — and re-validated if the stored model is no longer offered.
   useEffect(() => {
-    if (providerId) {
-      if (!providers.some((p) => p.id === providerId && p.available)) {
-        if (firstAvailable) {
-          setProviderId(firstAvailable.id)
-          setModelValue(firstAvailable.defaultModel)
+    if (!providers.length) return
+    const resolved = resolveInitialSelection(providers)
+    if (!resolved) return
+    setProviderId((prev) => {
+      setModel((prevModel) => {
+        const nextModel =
+          prev && prev === resolved.model
+            ? prevModel
+            : resolved.model
+        if (prev !== resolved.provider || prevModel !== nextModel) {
+          writeSelection({ provider: resolved.provider, model: nextModel })
         }
-      }
-      return
+        return nextModel
+      })
+      return resolved.provider
+    })
+  }, [providers])
+
+  // Never leave a stored model that the active provider cannot serve.
+  useEffect(() => {
+    if (!providerId || !providers.length) return
+    const next = reconcileModel(providers, providerId, model)
+    if (next !== model) {
+      setModel(next)
+      writeSelection({ provider: providerId, model: next })
     }
-    if (firstAvailable) {
-      setProviderId(firstAvailable.id)
-      setModelValue(firstAvailable.defaultModel)
-    } else {
-      const first = providers[0]
-      if (first) {
-        setProviderId(first.id)
-        setModelValue(first.defaultModel)
-      }
-    }
-  }, [providers, providerId, firstAvailable, setModelValue])
+  }, [providers, providerId, model])
 
   const activeProvider = providers.find((p) => p.id === providerId)
+  const providerModels = modelsFor(providers, providerId)
   const canSend = Boolean(activeProvider?.available && model.trim() && providers.length)
   const disabledReason =
     !canSend && providers.length > 0
       ? activeProvider?.available
-        ? 'Enter a model name in Ask settings to continue.'
+        ? 'Pick a model in Ask settings to continue.'
         : `No AI provider is configured yet. Add an API key in Ask settings or set ${activeProvider?.configHint} in .env.local.`
       : null
 
   const selectProvider = (id: string) => {
-    setProviderId(id)
     const next = providers.find((p) => p.id === id)
-    if (next) {
-      const modelValue = next.defaultModel
-      setModel(modelValue)
-      localStorage.setItem(MODEL_STORAGE, modelValue)
-    }
-    localStorage.setItem(PROV_STORAGE, id)
+    const nextModel = reconcileModel(providers, id, '')
+    setProviderId(id)
+    setModel(nextModel)
+    writeSelection({ provider: id, model: nextModel || next?.defaultModel || '' })
   }
+
+  /** Called when a reply actually arrives, so the working pair is proven. */
+  const noteSelectionWorked = useCallback(() => {
+    if (!providerId || !model) return
+    markSelectionWorking({ provider: providerId, model })
+  }, [providerId, model])
 
   const body = useMemo(() => ({ provider: providerId, model }), [providerId, model])
 
@@ -754,6 +901,26 @@ const deleteThread = useCallback(
                   </Button>
                 </div>
               ))}
+              {/* Nothing to search or resume yet, so the search box alone is a
+                  dead end. Say what Ask is for and give a way in. */}
+              {threads.every((t) => t.messageCount === 0) && (
+                <div className="ask-home-blank">
+                  <p className="ask-home-blank-text">
+                    Ask about this board — its blocks, notes, files,
+                    connections and custom types.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ask-newchat"
+                    onClick={enterNewChat}
+                  >
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    Start your first chat
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -774,6 +941,19 @@ const deleteThread = useCallback(
               <span className="ask-chat-title" title={activeThread?.title}>
                 {activeThread?.title ?? 'Chat'}
               </span>
+              {/* Reachable from inside a conversation. Without this, starting a
+                  new chat means going back to the list first, which reads as
+                  the panel having no way to move on. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={enterNewChat}
+                title="New chat"
+                aria-label="New chat"
+              >
+                <Plus className="size-3.5" />
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -785,21 +965,32 @@ const deleteThread = useCallback(
                 <Settings className="size-3.5" />
               </Button>
             </div>
-            <label className="ask-model-inline" title="Switch model">
+            <div className="ask-model-inline" title="Switch model">
               <span className="ask-model-inline-label">Model</span>
-              <Input
-                className="h-7 px-2 text-xs"
-                list="ask-model-options-header"
-                value={model}
-                onChange={(e) => setModelValue(e.target.value)}
-                spellCheck={false}
-              />
-              <datalist id="ask-model-options-header">
-                {(activeProvider?.models ?? []).map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
-            </label>
+              <Select
+                value={
+                  providerModels.includes(model) ? model : undefined
+                }
+                onValueChange={(v) => {
+                  if (v !== null) setModelValue(v)
+                }}
+                disabled={!activeProvider?.available || providerModels.length === 0}
+              >
+                <SelectTrigger
+                  className="ask-model-select"
+                  aria-label="Model"
+                >
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providerModels.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <AskThread
@@ -811,6 +1002,7 @@ const deleteThread = useCallback(
             onFocusBlock={onFocusBlock}
             onConversationChanged={syncThread}
             onOpenSettings={() => setSettingsOpen(true)}
+            onReplied={noteSelectionWorked}
           />
         </>
       )}
@@ -832,20 +1024,20 @@ const deleteThread = useCallback(
           if (!open) setDeleteTargetId(null)
         }}
       >
-        <AlertDialog.Content>
-          <AlertDialog.Header>
-            <AlertDialog.Title>Delete chat?</AlertDialog.Title>
-            <AlertDialog.Description>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete chat?</AlertDialogTitle>
+            <AlertDialogDescription>
               This will permanently delete the chat and its messages.
-            </AlertDialog.Description>
-          </AlertDialog.Header>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <div className="flex justify-end gap-2">
-            <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-            <AlertDialog.Action onClick={confirmDelete}>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
               Delete
-            </AlertDialog.Action>
+            </AlertDialogAction>
           </div>
-        </AlertDialog.Content>
+        </AlertDialogContent>
       </AlertDialog>
     </div>
   )

@@ -205,15 +205,15 @@ export function LeftDock({
           ref={tabsRef}
         >
           <TabsTrigger value="layers" id="dock-tab-layers" className="dock-tab">
-            Layers
+            <span className="dock-tab-label">Layers</span>
             <span className="dock-count">{placed.length}</span>
           </TabsTrigger>
           <TabsTrigger value="assets" id="dock-tab-assets" className="dock-tab">
-            Assets
+            <span className="dock-tab-label">Assets</span>
             <span className="dock-count">{unplaced.length}</span>
           </TabsTrigger>
           <TabsTrigger value="types" id="dock-tab-types" className="dock-tab">
-            Types
+            <span className="dock-tab-label">Types</span>
             <span className="dock-count">{types.length}</span>
           </TabsTrigger>
         </TabsList>

@@ -90,19 +90,22 @@ export function ToolRail({
           <ToggleGroupItem
             key={id}
             value={id}
+            className="tool-button w-8"
             aria-label={`${label} (${shortcut})`}
             title={`${label} (${shortcut})`}
+            // A single-value ToggleGroup deselects the active item instead of
+            // re-emitting it, so `onValueChange` never fires for a repeat click.
+            // That made the active tool look dead; select on click as well.
+            onClick={() => onSelect(id as Tool)}
           >
             <ToolIcon tool={id} />
-            <span className="tool-shortcut" aria-hidden="true">
-              {shortcut}
-            </span>
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
 
       {tool === 'link' && connectionType && onConnectionTypeChange && (
         <ToggleGroup
+          className="conn-type-picker"
           data-slot="conn-type-picker"
           orientation="vertical"
           value={[connectionType]}

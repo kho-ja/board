@@ -1831,10 +1831,13 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
         target.tagName === 'TEXTAREA' ||
         target.isContentEditable)
 
+    // Ask owns its own inputs, so its toggle must stay reachable: with focus in
+    // the chat search box or composer, the isTyping() guard used to swallow
+    // Ctrl+I entirely, which read as "the panel won't close".
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isTyping(event.target)) return
-
       const mod = event.metaKey || event.ctrlKey
+      if (isTyping(event.target) && !(mod && event.key.toLowerCase() === 'i')) return
+
       if (mod) {
         const key = event.key.toLowerCase()
         if (key === 'z') {
@@ -1883,6 +1886,10 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
           setDraftLink(null)
         } else if (selectedLinkId) {
           setSelectedLinkId(null)
+        } else if (aiOpen) {
+          // Escape is the third close path for Ask, alongside the rail button
+          // and the drawer's × — it works from the chat search box too.
+          setAiOpen(false)
         } else {
           setTool('move')
           setSelectedIds(new Set())
@@ -1932,7 +1939,7 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('paste', onPaste)
     }
-  }, [undo, redo, selectedIds, handleUnplaceBlocks, importFiles, viewCenter, addTextAt, draftLink, handleDeleteLink, selectedLinkId])
+  }, [undo, redo, selectedIds, handleUnplaceBlocks, importFiles, viewCenter, addTextAt, draftLink, handleDeleteLink, selectedLinkId, aiOpen])
 
   const onPress = useCallback(
     (world: Vec) => {
@@ -1999,7 +2006,12 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
       <div className="board-main">
         <ToolRail
           tool={tool}
-          onSelect={setTool}
+          onSelect={(next) => {
+            setTool(next)
+            // Picking a tool means "back to the board": Ask takes over the left
+            // panel, so leaving it open hides the dock behind a stale chat.
+            setAiOpen(false)
+          }}
           connectionType={pendingLinkType}
           onConnectionTypeChange={setPendingLinkType}
           aiOpen={aiOpen}

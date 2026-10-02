@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import { deleteApiKeyFn, upsertApiKeyFn } from '#/db/queries.functions'
 import type { AiProviderInfo } from '#/lib/ai/providers.server'
+import { modelsFor } from '#/lib/ai/selection'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -60,6 +62,7 @@ export function AskSettings({
   const [deleteKeyPending, setDeleteKeyPending] = useState<string | null>(null)
 
   const activeProvider = providers.find((p) => p.id === providerId)
+  const providerModels = modelsFor(providers, providerId)
 
   const saveKey = async (provider: string) => {
     if (!keyInput.trim()) return
@@ -141,19 +144,37 @@ export function AskSettings({
 
             <div className="grid gap-2">
               <Label htmlFor="ask-model">Model</Label>
-              <Input
-                id="ask-model"
-                list="ask-model-options"
-                value={model}
-                onChange={(e) => onModelChange(e.target.value)}
-                spellCheck={false}
-                placeholder="e.g. gpt-5.4-mini"
-              />
-              <datalist id="ask-model-options">
-                {(activeProvider?.models ?? []).map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
+              <Select
+                value={activeProvider?.models.includes(model) ? model : undefined}
+                onValueChange={(v) => {
+                  if (v !== null) onModelChange(v)
+                }}
+                disabled={!activeProvider || providerModels.length === 0}
+              >
+                <SelectTrigger id="ask-model" className="w-full">
+                  <SelectValue
+                    placeholder={
+                      providerModels.length
+                        ? 'Choose a model'
+                        : 'No models available'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {providerModels.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeProvider?.models.length ? null : (
+                <p className="text-xs text-muted-foreground">
+                  {activeProvider
+                    ? `${activeProvider.label} did not report any models.`
+                    : 'Choose a provider first.'}
+                </p>
+              )}
             </div>
 
             <Separator />
@@ -246,7 +267,7 @@ export function AskSettings({
           </div>
         </ScrollArea>
 
-        <DialogFooter showCloseButton={false}>
+        <DialogFooter showCloseButton={false} className="mx-0 mb-0">
           <DialogClose render={<Button />}>Done</DialogClose>
         </DialogFooter>
       </DialogContent>
