@@ -15,3 +15,8 @@ todos.json
 
 # opencode session data
 .opencode/
+
+# agent tooling artifacts (regenerable; not app source)
+.agents/
+.claude/
+skills-lock.json
