@@ -5,10 +5,15 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
+    // `.delta/` holds tool-managed worktrees, each a full copy of the repo
+    // including its own tsconfig.json. Recursing into it made typescript-eslint
+    // see multiple candidate TSConfigRootDirs and fail every file with a parsing
+    // error, which masked real lint output for the entire project.
     ignores: [
       'dist/**',
       'node_modules/**',
       'src/routeTree.gen.ts',
+      '.delta/**',
     ],
   },
   js.configs.recommended,
