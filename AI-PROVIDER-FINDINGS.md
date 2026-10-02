@@ -6,7 +6,7 @@ Every provider claim below was verified by calling the live APIs with the keys i
 
 ## Status: complete and pushed
 
-All items below are done and verified. Typecheck clean, 178 tests pass, build
+All items below are done and verified. Typecheck clean, 190 tests pass, build
 succeeds. Remaining known limitations are listed under "Still open".
 
 ## Root causes found
@@ -311,6 +311,7 @@ the answer will succeed.
 | Stale approval | cleared on run failure; retry ran the tool exactly once, no duplicate |
 | Chat list rows | transparent buttons; `x` sits inside the card; overflow 0 |
 | Empty-chat state | chips wrap and clamp to 2 lines; thread overflow 305px -> 0 |
+| Cascade sweep | all primitive-backed Ask rules in `brand-overrides`; guarded by test |
 
 `npx tsc --noEmit` clean · 178 tests pass (23 for the selection module) ·
 `npm run build` succeeds.
@@ -328,30 +329,36 @@ the blob with `git cat-file blob <sha>` instead.
 
 ## Ask panel layout bugs (the cascade-layer trap)
 
-Both remaining UI bugs had one cause: **Tailwind v4 cascade layers**. shadcn
-primitives ship their styling as *utilities* in JSX, and utilities beat any rule
-in `@layer components` regardless of specificity. Brand rules written there were
-silently dead. Both fixes live in `@layer brand-overrides`.
+One cause behind all of them: **Tailwind v4 cascade layers**. shadcn primitives
+ship their styling as *utilities* in JSX, and utilities beat any rule in
+`@layer components` regardless of specificity. Brand rules written there were
+silently dead -- no build error, the rule just never applied.
 
-**Chat list rows rendered as solid teal blocks.** `.ask-history-main` declared
-`bg-transparent`, but the button has no `variant` prop, so shadcn defaults to
-`variant="default"` and ships `bg-primary`. Measured `rgb(79, 184, 178)`. The
-fill also stopped short of the `x`, making the delete button look like it was
-floating outside the card, and both rows looked active because both were solid.
-Fixed by flattening the fill (and hover fill) for `.ask-history-main` and
-`.ask-search-hit` in `brand-overrides`.
+Measured casualties (intent -> actual), all since moved to `brand-overrides`:
 
-**Empty-chat state overflowed by 305px.** shadcn's Button ships
-`whitespace-nowrap` and a fixed `h-9`, so each suggestion chip stayed on one line
-at 493px. The flex column sized to max-content, dragging `.ask-empty` to 509px
-inside a 223px drawer and giving `.ask-thread` a 305px horizontal scroll. Fixed by
-letting the labels wrap, dropping the fixed height, clamping to 2 lines (a third
-made the empty state taller than header + composer combined), and pinning
-`.ask-empty` / `.ask-suggestions` with `min-width: 0; max-width: 100%`.
+| rule | intent | was rendering as | beaten by |
+| --- | --- | --- | --- |
+| `.ask-history-main` | transparent | solid `bg-primary` teal | default `variant` |
+| `.ask-suggestion` | wrap freely | 493px one-liner, 305px overflow | `whitespace-nowrap`, `h-9` |
+| `.ask-newchat` | border 0 / 7px / 8px / 11.2px | 0.8px / 8px / 10px / 12.8px | `size="sm"` |
+| `.ask-history-del` | border 0 / 6px / 13.6px | 0.8px / 8px / 14px | `size="icon-sm"` |
+| `.ai-drawer-close` | border 0 / 7px / 16px | 0.8px / 8px / 14px | `size="icon-sm"` |
+| `.ask-search-main` | 8px padding | 10px | `Input` `px-2.5` |
 
-This trap is almost certainly latent elsewhere in the Ask panel (`.ask-msg`,
-`.ask-tool-output`, the search-hit rows) and will surface the same way with long
-content. Only the reported cases were fixed.
+Two follow-on traps found while fixing these:
+
+- **`.ask-search-main` grew to 320px tall.** It and `.ask-search-input` were
+  applied to the same element, split across two rules, and the later `flex` won.
+  Merged into one rule; the unused class was dropped from the JSX.
+- **`.ask-search-hit` state rules** (`:hover`, `.is-active`, `:last-child`) were
+  in `components`, so hover showed shadcn's `bg-accent` instead of the lagoon
+  tint. Same move.
+
+`src/styles.test.ts` now guards this: it tokenizes `styles.css` by brace depth
+(stripping comments first, since they name these classes and contain braces) and
+asserts every primitive-backed class is declared in `brand-overrides`. Verified
+it fails when a rule is moved back. The trap has now cost five separate visual
+bugs, so this is worth a build-time failure rather than a comment.
 
 ## Repo housekeeping
 

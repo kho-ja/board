@@ -827,7 +827,7 @@ const deleteThread = useCallback(
 
           <Input
               type="search"
-              className="ask-search-input ask-search-main"
+              className="ask-search-main"
               aria-label="Search past chats"
               placeholder="Search past chats…"
               value={query}
