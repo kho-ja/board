@@ -411,40 +411,10 @@
     backdrop-filter: blur(12px);
   }
 
-  .tool-button,
-  .chrome-icon {
-    /* `font` is a shorthand that includes font-size/weight, so it must precede
-       the @apply below or it resets the brand weight back to the inherited one. */
-    font: inherit;
-    @apply inline-flex items-center justify-center w-9 h-9 border-0 rounded-lg bg-transparent text-sea-ink font-extrabold leading-none cursor-pointer;
-  }
-
-  .tool-button {
-    @apply mx-auto;
-  }
-
-  .tool-button:hover,
-  .chrome-icon:hover {
-    background: color-mix(in oklab, var(--lagoon) 18%, transparent);
-  }
-
-  .tool-button.is-active {
-    background: color-mix(in oklab, var(--lagoon) 26%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 40%, transparent) inset;
-  }
-
   /* M13 — connection type picker: popover to the right of the tool rail,
      visible only while the Connector tool is active. */
   .tool-rail {
     @apply relative z-30;
-  }
-
-  .conn-type-picker {
-    @apply absolute top-2 flex items-center gap-[0.3rem] p-[0.3rem] border border-line rounded-[10px];
-    left: calc(100% + 0.5rem);
-    background: color-mix(in oklab, var(--surface-strong) 92%, transparent);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 6px 22px rgba(10, 30, 34, 0.16);
   }
 
   .conn-type-dot {
@@ -570,19 +540,6 @@
 
   .zoom-cluster {
     @apply flex items-center gap-[0.1rem] p-[0.15rem] rounded-[8px];
-  }
-
-  .chrome-icon {
-    @apply w-[28px] h-[28px];
-  }
-
-  .zoom-percent {
-    @apply min-w-[3.25rem] border-0 bg-transparent text-sea-ink px-[0.2rem] text-[0.72rem] font-bold cursor-pointer tabular-nums;
-    font: inherit;
-  }
-
-  .zoom-percent:hover {
-    @apply text-lagoon-deep;
   }
 
   @media (max-width: 720px) {
@@ -948,35 +905,11 @@
 /* In-place Figma-style editor: transparent, borderless, matching the rendered
    text so only the caret is visible. The selection outline comes from the
    `.block-shell.is-editing` state, not a boxed text field. */
-.block-editor {
-  @apply block w-full rounded-none bg-transparent text-sea-ink text-[0.82rem] leading-[1.45] p-0 overflow-hidden whitespace-pre-wrap;
-  border: 0;
-  font: inherit;
-  outline: none;
-  resize: none;
-  box-shadow: none;
-  overflow-wrap: anywhere;
-  caret-color: color-mix(in oklab, var(--lagoon-deep) 90%, var(--sea-ink));
-}
-
 .block-shell.is-editing {
   @apply cursor-text;
 }
 
 /* ---------- File Group blocks ---------- */
-
-.group-create-button {
-  height: 32px;
-  border: 1px solid color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--lagoon) 10%, transparent);
-  @apply text-lagoon-deep px-[0.7rem] text-[0.72rem] font-extrabold cursor-pointer;
-  font: inherit;
-}
-
-.group-create-button:hover {
-  background: color-mix(in oklab, var(--lagoon) 22%, transparent);
-}
 
 /* M18 UI — Ask assistant toggle pinned to the bottom of the left tool rail.
    The button reuses `.tool-button` so it gets the same size + accent (`.is-active`)
@@ -1027,28 +960,6 @@
   @apply min-w-0 flex-1 text-sea-ink text-[0.8rem] font-extrabold leading-[1.2] overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
-.view-selector {
-  @apply flex flex-none border border-line rounded-[7px] p-[2px];
-  gap: 2px;
-  background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
-}
-
-.view-selector-btn {
-  @apply rounded-[5px] bg-transparent text-sea-ink-soft text-[0.62rem] font-extrabold uppercase tracking-[0.03em] cursor-pointer;
-  border: 0;
-  padding: 2px 7px;
-  font: inherit;
-}
-
-.view-selector-btn:hover {
-  @apply text-sea-ink;
-}
-
-.view-selector-btn.is-active {
-  background: color-mix(in oklab, var(--lagoon) 22%, transparent);
-  @apply text-lagoon-deep;
-}
-
 .file-group-body {
   @apply flex-1 min-h-0 overflow-auto p-[0.55rem];
 }
@@ -1062,19 +973,6 @@
   @apply flex flex-col p-0 list-none;
   gap: 0.35rem;
   margin: 0;
-}
-
-.file-group-member {
-  @apply flex items-center w-full rounded-[8px] text-sea-ink p-[0.35rem] px-[0.5rem] cursor-pointer min-w-0;
-  gap: 0.45rem;
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--surface-strong) 80%, transparent);
-  font: inherit;
-  text-align: left;
-}
-
-.file-group-member:hover {
-  border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
 }
 
 .file-group-member-icon {
@@ -1106,17 +1004,6 @@
   @apply text-sea-ink-soft text-[0.68rem] font-semibold;
 }
 
-.inspector-input {
-  @apply w-full border border-line rounded-[7px] text-sea-ink p-[0.35rem] px-[0.5rem] text-[0.74rem] font-semibold;
-  background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
-  font: inherit;
-}
-
-.inspector-input:focus {
-  outline: none;
-  border-color: color-mix(in oklab, var(--lagoon-deep) 50%, var(--line));
-}
-
 .inspector-hint {
   @apply m-0 text-sea-ink-soft text-[0.66rem] font-semibold;
 }
@@ -1124,26 +1011,6 @@
 .inspector-actions {
   @apply flex flex-col mt-auto;
   gap: 0.4rem;
-}
-
-.inspector-btn {
-  @apply border border-line rounded-[8px] text-sea-ink p-[0.45rem] px-[0.7rem] text-[0.72rem] font-bold cursor-pointer text-left;
-  background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
-  font: inherit;
-}
-
-.inspector-btn:hover {
-  border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
-}
-
-.inspector-btn.danger {
-  @apply text-danger;
-  border-color: color-mix(in oklab, var(--danger) 35%, var(--line));
-}
-
-.inspector-btn.danger.is-armed {
-  background: color-mix(in oklab, var(--danger) 16%, transparent);
-  border-color: color-mix(in oklab, var(--danger) 60%, var(--line));
 }
 
 /* ---------- Multi-Block Alignment (M10) ---------- */
@@ -1156,10 +1023,6 @@
 .inspector-align-row {
   @apply grid gap-[0.3rem];
   grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.inspector-align-btn {
-  @apply p-[0.35rem] px-[0.4rem] text-center text-[0.66rem];
 }
 
 }
@@ -1238,10 +1101,6 @@
     background: color-mix(in oklab, var(--lagoon-deep) 18%, transparent);
     color: var(--lagoon-deep);
     border: 1px solid color-mix(in oklab, var(--lagoon-deep) 30%, transparent);
-  }
-
-  .object-edit-schema-btn {
-    @apply text-[0.68rem] py-[0.25rem] px-[0.5rem];
   }
 
   .object-fields-list {
@@ -1674,6 +1533,150 @@
    This layer is declared after `utilities`, so the brand wins. Keep rules here
    only when they must outrank a shadcn primitive; everything else belongs back
    in `@layer components`. */
+/* --------------------------------------------------------------------------
+   Primitive-backed overrides outside the Ask panel.
+
+   These rules style elements that compose a shadcn primitive (Button, Input,
+   Textarea, ToggleGroup, ToggleGroupItem). The primitives ship their look as
+   Tailwind utilities, and Tailwind emits those in the `utilities` cascade layer.
+   Compiled layer order is components -> utilities -> brand-overrides, so a brand
+   rule left in `@layer components` loses to a plain `h-8` / `px-2.5` / `text-sm`
+   regardless of selector specificity -- silently, with no build error.
+
+   What the primitives actually apply:
+     Button          h-8 px-2.5 text-sm font-medium border bg-primary
+     Input           h-8 px-2.5 py-1 text-base md:text-sm rounded-lg border
+     Textarea        flex min-h-16 rounded-lg border px-2.5 py-2 text-base
+     toggle          h-8 min-w-8 px-2.5 text-sm font-medium rounded-lg
+     ToggleGroup     flex w-fit gap-[--spacing] rounded-lg
+
+   Consequences before this move: `.inspector-btn` lost its chip background to
+   `bg-primary` (solid teal buttons), `.inspector-input` rendered at 16px instead
+   of 0.74rem, `.block-editor` rendered as flex with a 1px rounded border and
+   0.625rem padding instead of a bare `p-0` text surface, and `.zoom-percent`
+   rendered 14px/medium on a teal fill instead of 0.72rem/bold transparent.
+
+   `src/styles.test.ts` asserts every class listed here stays in this layer.
+   ------------------------------------------------------------------------ */
+@layer brand-overrides {
+  .tool-button,
+  .chrome-icon {
+    /* `font` is a shorthand that includes font-size/weight, so it must precede
+       the @apply below or it resets the brand weight back to the inherited one. */
+    font: inherit;
+    @apply inline-flex items-center justify-center w-9 h-9 border-0 rounded-lg bg-transparent text-sea-ink font-extrabold leading-none cursor-pointer;
+  }
+  .tool-button {
+    @apply mx-auto;
+  }
+  .tool-button:hover,
+  .chrome-icon:hover {
+    background: color-mix(in oklab, var(--lagoon) 18%, transparent);
+  }
+  .tool-button.is-active {
+    background: color-mix(in oklab, var(--lagoon) 26%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 40%, transparent) inset;
+  }
+  .conn-type-picker {
+    @apply absolute top-2 flex items-center gap-[0.3rem] p-[0.3rem] border border-line rounded-[10px];
+    left: calc(100% + 0.5rem);
+    background: color-mix(in oklab, var(--surface-strong) 92%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 6px 22px rgba(10, 30, 34, 0.16);
+  }
+  .chrome-icon {
+    @apply w-[28px] h-[28px];
+  }
+  .zoom-percent {
+    @apply min-w-[3.25rem] border-0 bg-transparent text-sea-ink px-[0.2rem] text-[0.72rem] font-bold cursor-pointer tabular-nums;
+    font: inherit;
+  }
+  .zoom-percent:hover {
+    @apply text-lagoon-deep;
+  }
+.block-editor {
+  @apply block w-full rounded-none bg-transparent text-sea-ink text-[0.82rem] leading-[1.45] p-0 overflow-hidden whitespace-pre-wrap;
+  border: 0;
+  font: inherit;
+  outline: none;
+  resize: none;
+  box-shadow: none;
+  overflow-wrap: anywhere;
+  caret-color: color-mix(in oklab, var(--lagoon-deep) 90%, var(--sea-ink));
+}
+.group-create-button {
+  height: 32px;
+  border: 1px solid color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--lagoon) 10%, transparent);
+  @apply text-lagoon-deep px-[0.7rem] text-[0.72rem] font-extrabold cursor-pointer;
+  font: inherit;
+}
+.group-create-button:hover {
+  background: color-mix(in oklab, var(--lagoon) 22%, transparent);
+}
+.view-selector {
+  @apply flex flex-none border border-line rounded-[7px] p-[2px];
+  gap: 2px;
+  background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
+}
+.view-selector-btn {
+  @apply rounded-[5px] bg-transparent text-sea-ink-soft text-[0.62rem] font-extrabold uppercase tracking-[0.03em] cursor-pointer;
+  border: 0;
+  padding: 2px 7px;
+  font: inherit;
+}
+.view-selector-btn:hover {
+  @apply text-sea-ink;
+}
+.view-selector-btn.is-active {
+  background: color-mix(in oklab, var(--lagoon) 22%, transparent);
+  @apply text-lagoon-deep;
+}
+.file-group-member {
+  @apply flex items-center w-full rounded-[8px] text-sea-ink p-[0.35rem] px-[0.5rem] cursor-pointer min-w-0;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface-strong) 80%, transparent);
+  font: inherit;
+  text-align: left;
+}
+.file-group-member:hover {
+  border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
+}
+.inspector-input {
+  @apply w-full border border-line rounded-[7px] text-sea-ink p-[0.35rem] px-[0.5rem] text-[0.74rem] font-semibold;
+  background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
+  font: inherit;
+}
+.inspector-input:focus {
+  outline: none;
+  border-color: color-mix(in oklab, var(--lagoon-deep) 50%, var(--line));
+}
+.inspector-btn {
+  @apply border border-line rounded-[8px] text-sea-ink p-[0.45rem] px-[0.7rem] text-[0.72rem] font-bold cursor-pointer text-left;
+  background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
+  font: inherit;
+}
+.inspector-btn:hover {
+  border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
+}
+.inspector-btn.danger {
+  @apply text-danger;
+  border-color: color-mix(in oklab, var(--danger) 35%, var(--line));
+}
+.inspector-btn.danger.is-armed {
+  background: color-mix(in oklab, var(--danger) 16%, transparent);
+  border-color: color-mix(in oklab, var(--danger) 60%, var(--line));
+}
+.inspector-align-btn {
+  @apply p-[0.35rem] px-[0.4rem] text-center text-[0.66rem];
+}
+  .object-edit-schema-btn {
+    @apply text-[0.68rem] py-[0.25rem] px-[0.5rem];
+  }
+}
+
 @layer brand-overrides {
   /* ---------- Ask assistant drawer ----------
      Every rule below styles an element that composes a shadcn primitive, so all

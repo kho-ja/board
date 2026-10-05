@@ -14,15 +14,25 @@ import { describe, expect, it } from 'vitest'
  * applies.
  *
  * That has bitten this stylesheet repeatedly (the dock tab strip, the Ask search
- * box, the chat list rows, the suggestion chips, the "new chat" button), each
- * time surfacing as a visual bug rather than a build failure. Every rule
- * targeting one of the classes below therefore has to live in
+ * box, the chat list rows, the suggestion chips, the "new chat" button, the
+ * inspector buttons and inputs, the block text editor, the status-bar zoom
+ * control), each time surfacing as a visual bug rather than a build failure.
+ * Every rule targeting one of the classes below therefore has to live in
  * `@layer brand-overrides`.
  */
 
 const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), 'styles.css')
 
-/** Classes applied to an element that composes a shadcn primitive. */
+/**
+ * Classes applied to an element that composes a shadcn primitive.
+ *
+ * The non-Ask entries came out of a sweep that walked every app component,
+ * matched each className passed to a primitive against the layer map, and then
+ * compared the properties each brand rule declares against the ones the
+ * primitive's own variant string sets. Only classes with a real overlap are
+ * listed -- e.g. `.block-shell` is applied to a `ContextMenuTrigger`, whose only
+ * utility is `select-none`, so it is safe in `components` and is not listed.
+ */
 const PRIMITIVE_BACKED = [
   'ai-drawer-close',
   'ask-error-retry',
@@ -34,6 +44,19 @@ const PRIMITIVE_BACKED = [
   'ask-search-hit',
   'ask-search-main',
   'ask-suggestion',
+  'block-editor',
+  'chrome-icon',
+  'conn-type-picker',
+  'file-group-member',
+  'group-create-button',
+  'inspector-align-btn',
+  'inspector-btn',
+  'inspector-input',
+  'object-edit-schema-btn',
+  'tool-button',
+  'view-selector',
+  'view-selector-btn',
+  'zoom-percent',
 ] as const
 
 /**
