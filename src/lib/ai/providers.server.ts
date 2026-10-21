@@ -8,6 +8,7 @@ import {
 } from '@tanstack/ai-openrouter'
 
 import { decryptApiKey } from './encryption'
+import { createGeminiAdapter } from './gemini-adapter'
 import { getApiKey } from '#/db/queries.server'
 
 /**
@@ -263,7 +264,12 @@ export async function resolveAdapter(
   switch (providerId) {
     case 'gemini':
       return {
-        adapter: openaiCompatibleText(model, {
+        // Not the stock `openaiCompatibleText`: Gemini requires the
+        // `thought_signature` to be echoed back on the function-call part once
+        // a tool result follows it, and the generic adapter drops it in both
+        // directions. See `gemini-adapter.ts`.
+        adapter: createGeminiAdapter({
+          model,
           baseURL: GEMINI_BASE_URL,
           apiKey: key ?? '',
         }),

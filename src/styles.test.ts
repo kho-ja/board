@@ -140,6 +140,16 @@ describe('shadcn primitive overrides live in brand-overrides', () => {
     expect(firstComponents).toBeGreaterThan(-1)
     expect(brandOverrides).toBeGreaterThan(firstComponents)
   })
+
+  it('styles the pressed tool button, not only a class we never set', () => {
+    // The tool rail is a shadcn ToggleGroup: Base UI marks the selected item
+    // with `aria-pressed` and never adds a class of ours. A rule keyed only on
+    // `.is-active` therefore matches nothing, and because `.tool-button` sets
+    // `bg-transparent` in this (later) layer, the selected tool renders
+    // exactly like the unselected ones.
+    const css = readFileSync(cssPath, 'utf8')
+    expect(css).toMatch(/\.tool-button\[aria-pressed=['"]true['"]\]/)
+  })
 })
 
 /**

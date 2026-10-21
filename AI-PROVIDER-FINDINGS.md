@@ -295,6 +295,28 @@ the answer will succeed.
 
 ## Closed since
 
+- **Gemini tool calls no longer 400 (2026-10-21).** The `400 status code (no
+  body)` on the *second* turn was not a malformed request: it is what Google
+  returns when a function-call part is replayed without its `thought_signature`.
+  Gemini 3.x attaches the signature to the call
+  (`extra_content.google.thought_signature`) and requires it echoed back once a
+  tool result follows. The generic OpenAI-compatible adapter drops it in both
+  directions, so the follow-up request always lost it. `src/lib/ai/gemini-adapter.ts`
+  now round-trips it over the framework's own carrier
+  (`ToolCall.metadata.thoughtSignature`, the same contract `@tanstack/ai-gemini`
+  uses). Verified against the live API: a replayed tool call with the
+  signature re-attached returns 200, and without it 400.
+  - The SDK's `400 status code (no body)` is also a **masked** error: Google's
+    body is an array (`[{error:{...}}]`), which the OpenAI SDK's error parser
+    does not understand, so the real reason was discarded. The real message is
+    `Function call is missing a thought_signature in functionCall parts`.
+- **The active tool is highlighted again (2026-10-21).** The tool rail is a
+  shadcn `ToggleGroup`, so Base UI marks the selected button with
+  `aria-pressed` and never adds a class of our own — the old `.is-active`
+  rule matched nothing. The brand layer also sets `bg-transparent` on
+  `.tool-button`, and being declared after `utilities` it beat the primitive's
+  `aria-pressed:bg-muted`, so selected and unselected buttons looked alike.
+  The brand rule now keys off `aria-pressed` as well as `is-active`.
 - **Approval expiry is now time-based (2026-10-08).** Pending approvals are
   stamped with a first-seen time in localStorage (`src/lib/chat/approval-expiry.ts`,
   24h TTL) and cancelled on sight once the TTL passes — the clock survives

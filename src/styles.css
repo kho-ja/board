@@ -1558,7 +1558,19 @@
   .chrome-icon:hover {
     background: color-mix(in oklab, var(--lagoon) 18%, transparent);
   }
-  .tool-button.is-active {
+  /* The tool rail is a shadcn ToggleGroup, so the selected tool is marked with
+     `aria-pressed`, not with an `is-active` class -- the primitive sets
+     `aria-pressed` and `data-pressed`, and never adds a class of our own.
+     The rule below therefore matches both spellings: `is-active` for the
+     Ask button (a plain Button), `aria-pressed` for the tool toggles.
+
+     This rule must live here rather than relying on the primitive's
+     `aria-pressed:bg-muted` utility: the brand layer is declared after
+     `utilities`, and `.tool-button` sets `bg-transparent`, which would beat
+     the utility layer and leave every tool button transparent -- including
+     the selected one. */
+  .tool-button.is-active,
+  .tool-button[aria-pressed='true'] {
     background: color-mix(in oklab, var(--lagoon) 26%, transparent);
     box-shadow: 0 0 0 1px color-mix(in oklab, var(--lagoon-deep) 40%, transparent) inset;
   }
