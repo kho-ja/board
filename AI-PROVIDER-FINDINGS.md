@@ -292,13 +292,19 @@ the answer will succeed.
   heavy use; the model picker makes switching one click.
 - **Upstream tool-schema bug** (`openaiCompatibleText` emits unnamed tools) only
   bites requests that carry no client-sent tools, so it does not affect the app.
-- **Approval expiry is session-scoped, not time-based.** A card can still sit
-  across visits; it is only dropped once a run actually errors. A time-based
-  expiry (say, clear approvals older than N hours on hydrate) would be stricter
-  but risks discarding a legitimate pause.
-- **No `.gitattributes`.** The repo is genuinely mixed (two files CRLF, the rest
-  LF), so editors and tooling keep flipping files and producing whole-file
-  rewrites in diffs. Worth settling deliberately rather than by accident.
+
+## Closed since
+
+- **Approval expiry is now time-based (2026-10-08).** Pending approvals are
+  stamped with a first-seen time in localStorage (`src/lib/chat/approval-expiry.ts`,
+  24h TTL) and cancelled on sight once the TTL passes — the clock survives
+  reloads, so a card can no longer outlive its pause by days. Previously it was
+  session-scoped: only a run *error* cleared a stale card, so an approval whose
+  run never failed sat across visits forever. 8 unit tests; guarded so a
+  still-hydrating thread (empty live set) never wipes the stored times.
+- **`.gitattributes` settled (2026-10-02, `1da8147`).** The repo was genuinely
+  mixed (two files CRLF, the rest LF), which kept producing whole-file rewrites
+  in diffs. LF is now normalized repo-wide.
 
 ## Verified this session
 
@@ -322,10 +328,11 @@ the answer will succeed.
 
 ## Note on line endings
 
-This repo is mixed with no `.gitattributes`: `LeftDock.tsx` and `AskPanel.tsx`
-are CRLF in HEAD, while `index.tsx`, `styles.css`, `providers.server.ts`,
-`api.chat.ts`, `ToolRail.tsx` and `AskSettings.tsx` are LF. Match each file to its
-own committed convention or the diff shows a whole-file rewrite.
+Resolved: `.gitattributes` now normalizes the repo to LF (`1da8147`). Before
+that it was mixed — `LeftDock.tsx` and `AskPanel.tsx` were CRLF in HEAD, while
+`index.tsx`, `styles.css`, `providers.server.ts`, `api.chat.ts`, `ToolRail.tsx`
+and `AskSettings.tsx` were LF — and each edit had to match its own file's
+committed convention or the diff showed a whole-file rewrite.
 
 Caveat when checking this from PowerShell: `git show HEAD:file > tmp` re-encodes
 with CRLF, so it reports the *opposite* of what the blob actually contains. Read

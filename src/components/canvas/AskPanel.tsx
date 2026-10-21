@@ -33,6 +33,7 @@ import {
 import { ArrowLeft, Plus, Settings } from 'lucide-react'
 import { AskSettings } from './AskSettings'
 import { markdownComponents } from '#/lib/markdown/components'
+import { pruneApprovals, trackApproval } from '#/lib/chat/approval-expiry'
 import {
   CHAT_PREFIX,
   DEFAULT_TITLE,
@@ -295,6 +296,36 @@ function AskThread({
     expiredRun.current = error.message
     for (const interrupt of approvalInterrupts) interrupt.cancel()
   }, [error, approvalInterrupts])
+
+  /**
+   * Drop approvals that have simply aged out.
+   *
+   * The effect above only fires when the run has *failed*. An approval whose
+   * run never fails — the user asked for a mutation, closed the tab, and came
+   * back a day later — would otherwise sit on screen forever, offering a yes
+   * to a board that has moved on. Each interrupt's first-seen time lives in
+   * localStorage with the thread (`approval-expiry.ts`), so the clock survives
+   * reloads; once it passes the TTL the card is cancelled exactly like a
+   * failed run's, leaving the tool chip (and any error) as the honest record.
+   *
+   * The ref set keeps a lingering interrupt from being cancelled repeatedly
+   * while its resume submission is still in flight.
+   */
+  const expiredApprovals = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (approvalInterrupts.length === 0) return
+    const now = Date.now()
+    pruneApprovals(
+      threadId,
+      approvalInterrupts.map((interrupt) => interrupt.id),
+    )
+    for (const interrupt of approvalInterrupts) {
+      const { expired } = trackApproval(threadId, interrupt.id, { now })
+      if (!expired || expiredApprovals.current.has(interrupt.id)) continue
+      expiredApprovals.current.add(interrupt.id)
+      interrupt.cancel()
+    }
+  }, [threadId, approvalInterrupts])
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight })
