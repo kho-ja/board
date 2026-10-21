@@ -52,7 +52,9 @@ const PRIMITIVE_BACKED = [
   'inspector-align-btn',
   'inspector-btn',
   'inspector-input',
+  'inspector-pos-input',
   'object-edit-schema-btn',
+  'theme-toggle',
   'tool-button',
   'view-selector',
   'view-selector-btn',
@@ -137,5 +139,60 @@ describe('shadcn primitive overrides live in brand-overrides', () => {
     const brandOverrides = css.indexOf('@layer brand-overrides')
     expect(firstComponents).toBeGreaterThan(-1)
     expect(brandOverrides).toBeGreaterThan(firstComponents)
+  })
+})
+
+/**
+ * Guards the `font: inherit` shorthand trap.
+ *
+ * `font` is a shorthand for font-style/variant/weight/size/line-height/family,
+ * so a `font: inherit` placed after an `@apply` silently resets every font
+ * property that `@apply` just set -- the declaration order in the rule is the
+ * whole battle. The correct pattern (used by the dock rules) is `font: inherit`
+ * first, then `@apply` overrides on top.
+ *
+ * This bit the same sweep as the layer trap: `.zoom-percent` and friends were
+ * moved into brand-overrides correctly but kept `font: inherit` at the end of
+ * the rule, so they rendered at the inherited 16px/400 instead of 0.72rem/bold
+ * -- with a green build. The order is checked per rule body, comments stripped.
+ */
+describe('font: inherit never follows @apply in the same rule', () => {
+  it('has no rule where font: inherit cancels an @apply', () => {
+    const source = readFileSync(cssPath, 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    )
+    const offenders: string[] = []
+    let buffer = ''
+    let body = ''
+    let depth = 0
+
+    const check = () => {
+      const apply = body.indexOf('@apply')
+      const inherit = body.indexOf('font: inherit')
+      if (apply !== -1 && inherit > apply) {
+        // The 80 chars before the offending `font: inherit` name the rule.
+        offenders.push(body.slice(Math.max(0, inherit - 80), inherit + 13))
+      }
+    }
+
+    for (const ch of source) {
+      if (ch === '{') {
+        buffer = ''
+        depth++
+      } else if (ch === '}') {
+        check()
+        body = ''
+        buffer = ''
+        depth = Math.max(0, depth - 1)
+      } else {
+        buffer += ch
+        // Rule bodies accumulate; `@media`/`@layer` headers do not, because
+        // their body is checked piecewise through the nested rules.
+        if (depth > 0 && !buffer.trimStart().startsWith('@')) body += ch
+      }
+    }
+    expect(offenders, `font: inherit after @apply in:\n${offenders.join('\n---\n')}`)
+      .toEqual([])
   })
 })

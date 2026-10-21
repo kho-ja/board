@@ -394,16 +394,6 @@
     @apply text-sea-ink-soft text-[0.68rem] font-semibold;
   }
 
-  .theme-toggle {
-    @apply h-8 border border-line rounded-lg text-sea-ink px-[0.7rem] text-[0.72rem] font-bold cursor-pointer;
-    background: color-mix(in oklab, var(--surface-strong) 90%, transparent);
-    font: inherit;
-  }
-
-  .theme-toggle:hover {
-    @apply bg-surface-strong;
-  }
-
   .tool-rail {
     @apply flex flex-col gap-[0.15rem] flex-none w-12 border-r border-line;
     padding: 0.4rem 0.25rem;
@@ -499,11 +489,6 @@
 
   .position-field span {
     @apply text-sea-ink-soft text-[0.64rem] font-extrabold;
-  }
-
-  .position-field input {
-    @apply w-full min-w-0 border-0 outline-none bg-transparent text-sea-ink text-[0.74rem] font-semibold tabular-nums;
-    font: inherit;
   }
 
   .inspector-meta {
@@ -1588,16 +1573,16 @@
     @apply w-[28px] h-[28px];
   }
   .zoom-percent {
-    @apply min-w-[3.25rem] border-0 bg-transparent text-sea-ink px-[0.2rem] text-[0.72rem] font-bold cursor-pointer tabular-nums;
     font: inherit;
+    @apply min-w-[3.25rem] border-0 bg-transparent text-sea-ink px-[0.2rem] text-[0.72rem] font-bold cursor-pointer tabular-nums;
   }
   .zoom-percent:hover {
     @apply text-lagoon-deep;
   }
 .block-editor {
+  font: inherit;
   @apply block w-full rounded-none bg-transparent text-sea-ink text-[0.82rem] leading-[1.45] p-0 overflow-hidden whitespace-pre-wrap;
   border: 0;
-  font: inherit;
   outline: none;
   resize: none;
   box-shadow: none;
@@ -1605,12 +1590,12 @@
   caret-color: color-mix(in oklab, var(--lagoon-deep) 90%, var(--sea-ink));
 }
 .group-create-button {
+  font: inherit;
   height: 32px;
   border: 1px solid color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
   border-radius: 8px;
   background: color-mix(in oklab, var(--lagoon) 10%, transparent);
   @apply text-lagoon-deep px-[0.7rem] text-[0.72rem] font-extrabold cursor-pointer;
-  font: inherit;
 }
 .group-create-button:hover {
   background: color-mix(in oklab, var(--lagoon) 22%, transparent);
@@ -1621,10 +1606,10 @@
   background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
 }
 .view-selector-btn {
+  font: inherit;
   @apply rounded-[5px] bg-transparent text-sea-ink-soft text-[0.62rem] font-extrabold uppercase tracking-[0.03em] cursor-pointer;
   border: 0;
   padding: 2px 7px;
-  font: inherit;
 }
 .view-selector-btn:hover {
   @apply text-sea-ink;
@@ -1634,29 +1619,29 @@
   @apply text-lagoon-deep;
 }
 .file-group-member {
+  font: inherit;
   @apply flex items-center w-full rounded-[8px] text-sea-ink p-[0.35rem] px-[0.5rem] cursor-pointer min-w-0;
   gap: 0.45rem;
   border: 1px solid var(--line);
   background: color-mix(in oklab, var(--surface-strong) 80%, transparent);
-  font: inherit;
   text-align: left;
 }
 .file-group-member:hover {
   border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
 }
 .inspector-input {
+  font: inherit;
   @apply w-full border border-line rounded-[7px] text-sea-ink p-[0.35rem] px-[0.5rem] text-[0.74rem] font-semibold;
   background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
-  font: inherit;
 }
 .inspector-input:focus {
   outline: none;
   border-color: color-mix(in oklab, var(--lagoon-deep) 50%, var(--line));
 }
 .inspector-btn {
+  font: inherit;
   @apply border border-line rounded-[8px] text-sea-ink p-[0.45rem] px-[0.7rem] text-[0.72rem] font-bold cursor-pointer text-left;
   background: color-mix(in oklab, var(--chip-bg) 70%, transparent);
-  font: inherit;
 }
 .inspector-btn:hover {
   border-color: color-mix(in oklab, var(--lagoon-deep) 45%, var(--line));
@@ -1674,6 +1659,22 @@
 }
   .object-edit-schema-btn {
     @apply text-[0.68rem] py-[0.25rem] px-[0.5rem];
+  }
+  .theme-toggle {
+    font: inherit;
+    @apply h-8 border border-line rounded-lg text-sea-ink px-[0.7rem] text-[0.72rem] font-bold cursor-pointer;
+    background: color-mix(in oklab, var(--surface-strong) 90%, transparent);
+  }
+  .theme-toggle:hover {
+    @apply bg-surface-strong;
+  }
+  /* shadcn Input ships h-8 px-2.5 py-1 rounded-lg border text-base md:text-sm;
+     the position fields want a borderless transparent inline field instead. */
+  .inspector-pos-input {
+    font: inherit;
+    @apply w-full min-w-0 border-0 outline-none bg-transparent text-sea-ink text-[0.74rem] font-semibold tabular-nums;
+    height: auto;
+    padding: 0;
   }
 }
 
