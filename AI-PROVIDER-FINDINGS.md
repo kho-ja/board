@@ -310,6 +310,23 @@ the answer will succeed.
     body is an array (`[{error:{...}}]`), which the OpenAI SDK's error parser
     does not understand, so the real reason was discarded. The real message is
     `Function call is missing a thought_signature in functionCall parts`.
+  - **The rule, measured against the live API.** Google only demands the
+    signature when the transcript ends with a *tool result*, i.e. when the
+    model is being asked to continue the same turn. A transcript that ends with
+    a user message (a new turn) does not need it, and a signature from a
+    different conversation is accepted — but a malformed one is rejected with
+    the same "missing a thought_signature" message. So the requirement is
+    "some well-formed signature is present on the pending function call", not
+    "the exact signature from that call".
+  - **The second user turn is covered too.** The client replays the transcript
+    on every turn, so the signature has to survive client → AG-UI wire →
+    server → Gemini. It does: the wire carries it twice (the tool call's
+    `encryptedValue` and the message's `toolCallMetadata` bag), the framework
+    restores it to `metadata.thoughtSignature`, and the adapter re-attaches it.
+    Verified end to end against the live API — a replayed transcript with the
+    signature answers normally, and the identical transcript with every
+    signature carrier stripped 400s. Guarded by an offline test
+    (`gemini-adapter.test.ts`) that drives the whole inbound path.
 - **The active tool is highlighted again (2026-10-21).** The tool rail is a
   shadcn `ToggleGroup`, so Base UI marks the selected button with
   `aria-pressed` and never adds a class of our own — the old `.is-active`

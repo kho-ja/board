@@ -233,4 +233,71 @@ describe('GeminiThoughtSignatureAdapter', () => {
     const assistant = seen.bodies[1].messages.find((m) => m.role === 'assistant')
     expect(assistant?.tool_calls?.[0].extra_content).toBeUndefined()
   })
+
+  it('re-attaches a signature that arrived over the wire', async () => {
+    // The second user turn: the client replays the transcript, and the tool
+    // call's signature has to survive that hop (client -> AG-UI wire ->
+    // server -> Gemini). The wire carries it in two places -- the tool call's
+    // `encryptedValue` and the message's `toolCallMetadata` bag -- and the
+    // framework restores it to `metadata.thoughtSignature` before the adapter
+    // ever sees it. This test drives that whole path, because the signature is
+    // dropped in either direction otherwise, and the failure it causes is a
+    // 400 from Google rather than anything the adapter reports.
+    const { uiMessagesToWire, chatParamsFromRequestBody, convertMessagesToModelMessages } =
+      await import('@tanstack/ai')
+
+    const wire = uiMessagesToWire([
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [{ type: 'text', content: 'How many blocks are on the board?' }],
+      },
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-call',
+            id: 'call_123',
+            name: 'board_context',
+            arguments: '{}',
+            input: {},
+            state: 'input-complete',
+            metadata: { thoughtSignature: SIGNATURE },
+          },
+          {
+            type: 'tool-result',
+            toolCallId: 'call_123',
+            name: 'board_context',
+            content: '{"blocks":[]}',
+            state: 'complete',
+          },
+        ],
+      },
+    ])
+
+    const params = await chatParamsFromRequestBody({
+      threadId: 't1',
+      runId: 'r1',
+      tools: [],
+      context: [],
+      messages: wire,
+      state: {},
+    })
+    const messages = convertMessagesToModelMessages(params.messages)
+
+    const { adapter, seen } = await makeAdapter('call_123')
+    for await (const _event of adapter.chatStream({
+      model: 'gemini-3.1-flash-lite',
+      messages,
+      logger,
+    })) {
+      // drain
+    }
+
+    const assistant = seen.bodies[0].messages.find((m) => m.role === 'assistant')
+    expect(
+      assistant?.tool_calls?.[0].extra_content?.google?.thought_signature,
+    ).toBe(SIGNATURE)
+  })
 })
