@@ -2,10 +2,19 @@ import type { ChatPersistedState, UIMessage } from '@tanstack/ai-client'
 
 /**
  * M18 — Ask history: every Ask thread is one `ChatPersistedState` blob in
- * localStorage under `khoja.chat.<threadId>` (the same client-authoritative
- * storage `useChat` already uses, just namespaced per thread instead of a
- * single fixed thread). A small index keeps thread metadata so the panel can
- * list, resume, delete, and search across all past conversations.
+ * localStorage under `khoja.chat.<boardId>.<threadId>` (the same
+ * client-authoritative storage `useChat` already uses, just namespaced per
+ * thread and per board instead of a single fixed thread). A small index keeps
+ * thread metadata so the panel can list, resume, delete, and search across a
+ * board's past conversations.
+ *
+ * **Why the board is part of the key:** a conversation is *about* a board. It
+ * carries that board's blocks and tool output in its transcript, and the
+ * server binds the Ask tools to whichever board the request names. Keeping
+ * conversations in one global bucket would mean a thread started on one board
+ * stayed open after switching to another — and its history (including the other
+ * board's content) would be sent back to the model alongside the new board's
+ * tools. Scoping the storage by board keeps the two apart.
  *
  * All functions here are pure/IO-light so they're unit-testable; the UI owns
  * rendering.
@@ -13,11 +22,39 @@ import type { ChatPersistedState, UIMessage } from '@tanstack/ai-client'
 
 /** Storage keys (namespaced apart from the per-thread blobs). */
 export const CHAT_PREFIX = 'khoja.chat.'
-export const CHAT_INDEX_KEY = `${CHAT_PREFIX}index`
-export const CHAT_ACTIVE_KEY = `${CHAT_PREFIX}active`
 
-/** The pre-M18 single-thread blob (`tanstack-ai:` default prefix + fixed id). */
+/**
+ * The pre-M18 single-thread blob (`tanstack-ai:` default prefix + fixed id).
+ */
 export const LEGACY_CHAT_KEY = 'tanstack-ai:khoja-board-ask'
+
+/**
+ * The M18-era *global* index and active-thread pointers, before Ask history
+ * was scoped to a board. Read once to migrate old conversations into the
+ * board they were started on; see `migrateUnscopedThreads`.
+ */
+export const UNSCOPED_INDEX_KEY = `${CHAT_PREFIX}index`
+export const UNSCOPED_ACTIVE_KEY = `${CHAT_PREFIX}active`
+
+/** The storage namespace for one board: `khoja.chat.<boardId>.` */
+export function chatScope(boardId: string): string {
+  return `${CHAT_PREFIX}${boardId}.`
+}
+
+/** The key holding one board's thread index. */
+export function threadIndexKey(boardId: string): string {
+  return `${chatScope(boardId)}index`
+}
+
+/** The key holding one board's active thread id. */
+export function activeThreadKey(boardId: string): string {
+  return `${chatScope(boardId)}active`
+}
+
+/** The key holding one thread's transcript. */
+export function threadKey(boardId: string, threadId: string): string {
+  return `${chatScope(boardId)}${threadId}`
+}
 
 export interface ThreadMeta {
   id: string
@@ -38,9 +75,9 @@ export function newThreadId(): string {
 
 // ---------- thread index (localStorage) ----------
 
-export function loadThreadIndex(): ThreadMeta[] {
+export function loadThreadIndex(boardId: string): ThreadMeta[] {
   try {
-    const raw = localStorage.getItem(CHAT_INDEX_KEY)
+    const raw = localStorage.getItem(threadIndexKey(boardId))
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -55,25 +92,25 @@ export function loadThreadIndex(): ThreadMeta[] {
   }
 }
 
-export function saveThreadIndex(threads: ThreadMeta[]): void {
+export function saveThreadIndex(boardId: string, threads: ThreadMeta[]): void {
   try {
-    localStorage.setItem(CHAT_INDEX_KEY, JSON.stringify(threads))
+    localStorage.setItem(threadIndexKey(boardId), JSON.stringify(threads))
   } catch {
     // best-effort, mirroring the chat persistence layer
   }
 }
 
-export function loadActiveThreadId(): string | null {
+export function loadActiveThreadId(boardId: string): string | null {
   try {
-    return localStorage.getItem(CHAT_ACTIVE_KEY)
+    return localStorage.getItem(activeThreadKey(boardId))
   } catch {
     return null
   }
 }
 
-export function saveActiveThreadId(id: string): void {
+export function saveActiveThreadId(boardId: string, id: string): void {
   try {
-    localStorage.setItem(CHAT_ACTIVE_KEY, id)
+    localStorage.setItem(activeThreadKey(boardId), id)
   } catch {
     // best-effort
   }
@@ -81,11 +118,12 @@ export function saveActiveThreadId(id: string): void {
 
 /** Read one thread blob, returned either way for tests that fake storage. */
 export function readThreadBlob(
+  boardId: string,
   threadId: string,
   storage: Pick<Storage, 'getItem'> = localStorage,
 ): ChatPersistedState | null {
   try {
-    const raw = storage.getItem(`${CHAT_PREFIX}${threadId}`)
+    const raw = storage.getItem(threadKey(boardId, threadId))
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (parsed && Array.isArray(parsed.messages)) return parsed
@@ -98,11 +136,12 @@ export function readThreadBlob(
 
 /**
  * Migrate the pre-M18 single fixed thread into the per-thread model. Writes
- * the migrated blob under its new per-thread key and deletes the legacy key.
- * Returns the migrated thread metadata, or null when there was nothing to
- * migrate.
+ * the migrated blob under its new per-board, per-thread key and deletes the
+ * legacy key. Returns the migrated thread metadata, or null when there was
+ * nothing to migrate.
  */
 export function migrateLegacyThread(
+  boardId: string,
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = localStorage,
 ): ThreadMeta | null {
   try {
@@ -117,9 +156,73 @@ export function migrateLegacyThread(
     const messages = Array.isArray(parsed) ? parsed : parsed && Array.isArray((parsed as { messages?: unknown }).messages) ? (parsed as { messages: UIMessage[] }).messages : null
     if (!messages) return null
     const id = newThreadId()
-    storage.setItem(`${CHAT_PREFIX}${id}`, JSON.stringify({ messages }))
+    storage.setItem(threadKey(boardId, id), JSON.stringify({ messages }))
     storage.removeItem(LEGACY_CHAT_KEY)
     return threadMetaFromMessages(id, messages as UIMessage[])
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Move M18-era *unscoped* conversations into a board.
+ *
+ * Before Ask history was board-scoped every conversation shared one global
+ * bucket (`khoja.chat.index` + `khoja.chat.<threadId>`). Those conversations
+ * all belong to the board the user was working on, so the first board opened
+ * adopts them and the global bucket is removed. Without this, upgrading would
+ * silently drop the user's chat history.
+ *
+ * Returns the adopted thread metadata, or null when there was nothing to move.
+ */
+export function migrateUnscopedThreads(
+  boardId: string,
+  storage: Pick<
+    Storage,
+    'getItem' | 'setItem' | 'removeItem'
+  > = localStorage,
+): ThreadMeta[] | null {
+  try {
+    const raw = storage.getItem(UNSCOPED_INDEX_KEY)
+    if (!raw) return null
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      storage.removeItem(UNSCOPED_INDEX_KEY)
+      return null
+    }
+    if (!Array.isArray(parsed)) {
+      storage.removeItem(UNSCOPED_INDEX_KEY)
+      return null
+    }
+
+    const threads = parsed.filter(
+      (t): t is ThreadMeta =>
+        Boolean(t) &&
+        typeof t.id === 'string' &&
+        typeof t.title === 'string',
+    )
+
+    const adopted: ThreadMeta[] = []
+    for (const thread of threads) {
+      const blob = storage.getItem(`${CHAT_PREFIX}${thread.id}`)
+      if (blob) {
+        storage.setItem(threadKey(boardId, thread.id), blob)
+        storage.removeItem(`${CHAT_PREFIX}${thread.id}`)
+      }
+      adopted.push(thread)
+    }
+
+    const active = storage.getItem(UNSCOPED_ACTIVE_KEY)
+    if (active) {
+      storage.setItem(activeThreadKey(boardId), active)
+      storage.removeItem(UNSCOPED_ACTIVE_KEY)
+    }
+    storage.removeItem(UNSCOPED_INDEX_KEY)
+
+    return adopted
   } catch {
     return null
   }

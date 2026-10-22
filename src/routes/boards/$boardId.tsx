@@ -2052,7 +2052,15 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
         />
         {aiOpen ? (
           <AIDrawer onClose={() => setAiOpen(false)}>
-            <AskPanel boardId={boardId} onFocusBlock={focusBlock} />
+            {/* Keyed by board: Ask conversations are board-scoped, so
+                switching boards must start the panel over on the new
+                board's threads rather than carrying the old transcript
+                (and the old board's content) across. */}
+            <AskPanel
+              key={boardId}
+              boardId={boardId}
+              onFocusBlock={focusBlock}
+            />
           </AIDrawer>
         ) : (
           <LeftDock

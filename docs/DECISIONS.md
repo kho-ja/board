@@ -60,6 +60,13 @@ unit of isolation.
   another person's board.
 - **The board is in the URL** (`/boards/$boardId`), and the board-scoped
   TanStack DB collections are created per board.
+- **Ask history is board-scoped.** Conversations live in localStorage under
+  `khoja.chat.<boardId>.*` — the transcript, the thread index, the active
+  thread and the pending-approval state. A conversation carries its board's
+  blocks and tool output, and the server binds the Ask tools to whichever
+  board the request names, so keeping conversations in one global bucket would
+  let a thread started on one board stay open on another, sending the first
+  board's content back to the model alongside the second board's tools.
 - **Deleting an account does not destroy boards.** `boards.owner_id` is
   `ON DELETE SET NULL`, not `CASCADE`: a board other people are working on
   must survive the departure of the person who created it.

@@ -170,10 +170,15 @@ things are done before they are done.
   board route moved to `/boards/$boardId` with a board switcher in the top bar
   and a board list at `/boards`; the TanStack DB collections are now created
   per board. API keys became per-user, and the Ask tools are built per request
-  against one board. Verified live: sign-up, sign-in, board creation and
-  switching, a second account seeing an empty board list, a shared board
-  opening read-only for a viewer, and reads/writes on a foreign board being
-  rejected server-side.
+  against one board. Ask *history* is board-scoped too: conversations, the
+  thread index, the active thread and the pending-approval state all live
+  under `khoja.chat.<boardId>.*`, so a conversation started on one board never
+  appears — or keeps sending the old board's content back to the model — on
+  another. Conversations from before the split are adopted by the first board
+  opened rather than dropped. Verified live: sign-up, sign-in, board creation
+  and switching, a second account seeing an empty board list, a shared board
+  opening read-only for a viewer, reads/writes on a foreign board being
+  rejected server-side, and one board's chat history staying out of another's.
 
 ## Next (in rough order)
 

@@ -16,26 +16,27 @@ function makeStorage() {
   }
 }
 
+const BOARD = 'board-1'
 const THREAD = 'thread-1'
 const INTERRUPT = 'approval_call_42'
 
 describe('approval expiry', () => {
   it('stamps an unseen approval with now and does not expire it', () => {
     const storage = makeStorage()
-    const result = trackApproval(THREAD, INTERRUPT, {
+    const result = trackApproval(BOARD, THREAD, INTERRUPT, {
       now: 1_000_000,
       storage,
     })
     expect(result).toEqual({ firstSeen: 1_000_000, expired: false })
-    expect(storage.raw.get(approvalSeenKey(THREAD))).toBe(
+    expect(storage.raw.get(approvalSeenKey(BOARD, THREAD))).toBe(
       JSON.stringify({ [INTERRUPT]: 1_000_000 }),
     )
   })
 
   it('keeps the original first-seen time across repeated observations', () => {
     const storage = makeStorage()
-    trackApproval(THREAD, INTERRUPT, { now: 1_000_000, storage })
-    const later = trackApproval(THREAD, INTERRUPT, {
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 1_000_000, storage })
+    const later = trackApproval(BOARD, THREAD, INTERRUPT, {
       now: 1_000_000 + 60_000,
       storage,
     })
@@ -45,15 +46,15 @@ describe('approval expiry', () => {
 
   it('expires only once the TTL has elapsed', () => {
     const storage = makeStorage()
-    trackApproval(THREAD, INTERRUPT, { now: 1_000_000, storage })
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 1_000_000, storage })
 
-    const justUnder = trackApproval(THREAD, INTERRUPT, {
+    const justUnder = trackApproval(BOARD, THREAD, INTERRUPT, {
       now: 1_000_000 + APPROVAL_TTL_MS - 1,
       storage,
     })
     expect(justUnder.expired).toBe(false)
 
-    const atTtl = trackApproval(THREAD, INTERRUPT, {
+    const atTtl = trackApproval(BOARD, THREAD, INTERRUPT, {
       now: 1_000_000 + APPROVAL_TTL_MS,
       storage,
     })
@@ -62,8 +63,8 @@ describe('approval expiry', () => {
 
   it('honours a custom TTL', () => {
     const storage = makeStorage()
-    trackApproval(THREAD, INTERRUPT, { now: 5_000, ttl: 1_000, storage })
-    const result = trackApproval(THREAD, INTERRUPT, {
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 5_000, ttl: 1_000, storage })
+    const result = trackApproval(BOARD, THREAD, INTERRUPT, {
       now: 6_000,
       ttl: 1_000,
       storage,
@@ -73,12 +74,12 @@ describe('approval expiry', () => {
 
   it('keeps approvals of different threads and interrupts apart', () => {
     const storage = makeStorage()
-    trackApproval(THREAD, INTERRUPT, { now: 1_000, storage })
-    const other = trackApproval('thread-2', INTERRUPT, {
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 1_000, storage })
+    const other = trackApproval(BOARD, 'thread-2', INTERRUPT, {
       now: 1_000,
       storage,
     })
-    const sameThreadOther = trackApproval(THREAD, 'approval_call_43', {
+    const sameThreadOther = trackApproval(BOARD, THREAD, 'approval_call_43', {
       now: 2_000,
       storage,
     })
@@ -87,17 +88,37 @@ describe('approval expiry', () => {
     expect(sameThreadOther.expired).toBe(false)
   })
 
+  it('keeps one board\'s approvals out of another board\'s', () => {
+    const storage = makeStorage()
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 1_000, storage })
+
+    // The same thread id on a different board is a different conversation.
+    const onOtherBoard = trackApproval('board-2', THREAD, INTERRUPT, {
+      now: 1_000,
+      storage,
+    })
+    expect(onOtherBoard.firstSeen).toBe(1_000)
+
+    // ...and the other board's map is a separate entry.
+    expect(storage.raw.get(approvalSeenKey(BOARD, THREAD))).toBe(
+      JSON.stringify({ [INTERRUPT]: 1_000 }),
+    )
+    expect(storage.raw.get(approvalSeenKey('board-2', THREAD))).toBe(
+      JSON.stringify({ [INTERRUPT]: 1_000 }),
+    )
+  })
+
   it('treats a corrupt or non-numeric stored map as empty', () => {
     const storage = makeStorage()
-    storage.setItem(approvalSeenKey(THREAD), 'not json')
-    const fromGarbage = trackApproval(THREAD, INTERRUPT, {
+    storage.setItem(approvalSeenKey(BOARD, THREAD), 'not json')
+    const fromGarbage = trackApproval(BOARD, THREAD, INTERRUPT, {
       now: 7_000,
       storage,
     })
     expect(fromGarbage).toEqual({ firstSeen: 7_000, expired: false })
 
-    storage.setItem(approvalSeenKey(THREAD), JSON.stringify({ [INTERRUPT]: 'nope' }))
-    const fromBadValue = trackApproval(THREAD, INTERRUPT, {
+    storage.setItem(approvalSeenKey(BOARD, THREAD), JSON.stringify({ [INTERRUPT]: 'nope' }))
+    const fromBadValue = trackApproval(BOARD, THREAD, INTERRUPT, {
       now: 8_000,
       storage,
     })
@@ -106,25 +127,25 @@ describe('approval expiry', () => {
 
   it('prunes first-seen times for approvals that are no longer live', () => {
     const storage = makeStorage()
-    trackApproval(THREAD, INTERRUPT, { now: 1_000, storage })
-    trackApproval(THREAD, 'approval_gone', { now: 2_000, storage })
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 1_000, storage })
+    trackApproval(BOARD, THREAD, 'approval_gone', { now: 2_000, storage })
 
-    pruneApprovals(THREAD, [INTERRUPT], { storage })
+    pruneApprovals(BOARD, THREAD, [INTERRUPT], { storage })
 
-    expect(storage.raw.get(approvalSeenKey(THREAD))).toBe(
+    expect(storage.raw.get(approvalSeenKey(BOARD, THREAD))).toBe(
       JSON.stringify({ [INTERRUPT]: 1_000 }),
     )
     // the live approval keeps its original clock
-    const again = trackApproval(THREAD, INTERRUPT, { now: 3_000, storage })
+    const again = trackApproval(BOARD, THREAD, INTERRUPT, { now: 3_000, storage })
     expect(again.firstSeen).toBe(1_000)
   })
 
   it('pruning against an unknown id leaves an empty map, not a crash', () => {
     const storage = makeStorage()
-    trackApproval(THREAD, INTERRUPT, { now: 1_000, storage })
-    pruneApprovals(THREAD, ['brand-new'], { storage })
-    expect(storage.raw.get(approvalSeenKey(THREAD))).toBe('{}')
-    const fresh = trackApproval(THREAD, 'brand-new', { now: 4_000, storage })
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 1_000, storage })
+    pruneApprovals(BOARD, THREAD, ['brand-new'], { storage })
+    expect(storage.raw.get(approvalSeenKey(BOARD, THREAD))).toBe('{}')
+    const fresh = trackApproval(BOARD, THREAD, 'brand-new', { now: 4_000, storage })
     expect(fresh.expired).toBe(false)
   })
 })
