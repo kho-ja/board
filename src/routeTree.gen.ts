@@ -10,11 +10,19 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
+import { Route as BoardsIndexRouteImport } from './routes/boards/index'
+import { Route as BoardsBoardIdRouteImport } from './routes/boards/$boardId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -22,31 +30,54 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BoardsIndexRoute = BoardsIndexRouteImport.update({
+  id: '/boards/',
+  path: '/boards/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoardsBoardIdRoute = BoardsBoardIdRouteImport.update({
+  id: '/boards/$boardId',
+  path: '/boards/$boardId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
+  '/boards/$boardId': typeof BoardsBoardIdRoute
+  '/boards/': typeof BoardsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
+  '/boards/$boardId': typeof BoardsBoardIdRoute
+  '/boards': typeof BoardsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
+  '/boards/$boardId': typeof BoardsBoardIdRoute
+  '/boards/': typeof BoardsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/chat'
+  fullPaths: '/' | '/login' | '/api/chat' | '/boards/$boardId' | '/boards/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/chat'
-  id: '__root__' | '/' | '/api/chat'
+  to: '/' | '/login' | '/api/chat' | '/boards/$boardId' | '/boards'
+  id:
+    '__root__' | '/' | '/login' | '/api/chat' | '/boards/$boardId' | '/boards/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   ApiChatRoute: typeof ApiChatRoute
+  BoardsBoardIdRoute: typeof BoardsBoardIdRoute
+  BoardsIndexRoute: typeof BoardsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +89,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -65,12 +103,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/boards/': {
+      id: '/boards/'
+      path: '/boards'
+      fullPath: '/boards/'
+      preLoaderRoute: typeof BoardsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/boards/$boardId': {
+      id: '/boards/$boardId'
+      path: '/boards/$boardId'
+      fullPath: '/boards/$boardId'
+      preLoaderRoute: typeof BoardsBoardIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   ApiChatRoute: ApiChatRoute,
+  BoardsBoardIdRoute: BoardsBoardIdRoute,
+  BoardsIndexRoute: BoardsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

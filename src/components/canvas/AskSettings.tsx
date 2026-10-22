@@ -68,11 +68,12 @@ export function AskSettings({
     if (!keyInput.trim()) return
     setUpsertKeyPending(provider)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (upsertApiKeyFn as any)({
-        provider,
-        encryptedKey: keyInput.trim(),
-        baseUrl: baseUrlInput.trim() || undefined,
+      await upsertApiKeyFn({
+        data: {
+          provider,
+          encryptedKey: keyInput.trim(),
+          baseUrl: baseUrlInput.trim() || undefined,
+        },
       })
       queryClient.invalidateQueries({ queryKey: ['ask-providers'] })
       setEditingKey(null)
@@ -86,8 +87,7 @@ export function AskSettings({
   const deleteKey = async (provider: string) => {
     setDeleteKeyPending(provider)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (deleteApiKeyFn as any)({ provider })
+      await deleteApiKeyFn({ data: { provider } })
       queryClient.invalidateQueries({ queryKey: ['ask-providers'] })
     } finally {
       setDeleteKeyPending(null)

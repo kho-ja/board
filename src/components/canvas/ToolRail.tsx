@@ -18,6 +18,8 @@ interface ToolRailProps {
   /** M18 UI — Ask assistant lives in the left rail so it is always reachable. */
   aiOpen?: boolean
   onToggleAI?: () => void
+  /** Viewers get a read-only rail: no Text or Connector tool. */
+  canEdit?: boolean
 }
 
 function ToolIcon({ tool }: { tool: Tool }) {
@@ -74,7 +76,12 @@ export function ToolRail({
   onConnectionTypeChange,
   aiOpen = false,
   onToggleAI,
+  canEdit = true,
 }: ToolRailProps) {
+  const tools = canEdit
+    ? TOOLS
+    : TOOLS.filter((entry) => entry.id === 'move' || entry.id === 'hand')
+
   return (
     <nav className="tool-rail" aria-label="Tools">
       <ToggleGroup
@@ -86,7 +93,7 @@ export function ToolRail({
           if (next) onSelect(next as Tool)
         }}
       >
-        {TOOLS.map(({ id, label, shortcut }) => (
+        {tools.map(({ id, label, shortcut }) => (
           <ToggleGroupItem
             key={id}
             value={id}

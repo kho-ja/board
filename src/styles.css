@@ -390,6 +390,14 @@
     @apply flex items-center gap-2;
   }
 
+  .board-switcher {
+    @apply max-w-[13rem] gap-1.5;
+  }
+
+  .board-switcher-name {
+    @apply truncate;
+  }
+
   .topbar-hint {
     @apply text-sea-ink-soft text-[0.68rem] font-semibold;
   }

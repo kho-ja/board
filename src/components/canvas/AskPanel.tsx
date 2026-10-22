@@ -613,10 +613,14 @@ function AskThread({
 
 export function AskPanel({
   onFocusBlock,
+  boardId,
 }: {
   /** Given a block id that a tool just created, pans/selects it on the canvas
    *  (used to bring freshly-drawn diagrams into view). */
   onFocusBlock?: (blockId: string) => void
+  /** The board this conversation is about. The server scopes every tool to
+   *  it, so the assistant can never read or write another board. */
+  boardId: string
 }) {
   const { data: providers = [] } = useQuery<AiProviderInfo[]>({
     queryKey: ['ask-providers'],
@@ -721,7 +725,10 @@ export function AskPanel({
     markSelectionWorking({ provider: providerId, model })
   }, [providerId, model])
 
-  const body = useMemo(() => ({ provider: providerId, model }), [providerId, model])
+  const body = useMemo(
+    () => ({ provider: providerId, model, boardId }),
+    [providerId, model, boardId],
+  )
 
   const syncThread = useCallback(
     (messages: UIMessage[]) => {

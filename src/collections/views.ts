@@ -5,30 +5,39 @@ import type { QueryClient } from '@tanstack/react-query'
 import { deleteViewFn, insertViewFn, listViewsFn, updateViewFn } from '#/db/queries.functions'
 import { ViewSchema } from '#/types/schemas'
 
-export function createViewsCollection(queryClient: QueryClient) {
+export function createViewsCollection(
+  queryClient: QueryClient,
+  boardId: string,
+) {
   return createCollection(
     queryCollectionOptions({
-      id: 'views',
-      queryKey: ['views'],
+      id: `views:${boardId}`,
+      queryKey: ['views', boardId],
       queryClient,
       schema: ViewSchema,
       getKey: (view) => view.id,
-      queryFn: async () => listViewsFn(),
+      queryFn: async () => listViewsFn({ data: { boardId } }),
       onInsert: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await insertViewFn({ data: mutation.modified })
+          await insertViewFn({
+            data: { boardId, view: mutation.modified },
+          })
         }
       },
       onUpdate: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
           await updateViewFn({
-            data: { id: mutation.key, changes: mutation.changes },
+            data: {
+              boardId,
+              id: mutation.key,
+              changes: mutation.changes,
+            },
           })
         }
       },
       onDelete: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await deleteViewFn({ data: { id: mutation.key } })
+          await deleteViewFn({ data: { boardId, id: mutation.key } })
         }
       },
     }),

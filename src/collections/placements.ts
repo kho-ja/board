@@ -10,30 +10,39 @@ import {
 } from '#/db/queries.functions'
 import { PlacementSchema } from '#/types/schemas'
 
-export function createPlacementsCollection(queryClient: QueryClient) {
+export function createPlacementsCollection(
+  queryClient: QueryClient,
+  boardId: string,
+) {
   return createCollection(
     queryCollectionOptions({
-      id: 'placements',
-      queryKey: ['placements'],
+      id: `placements:${boardId}`,
+      queryKey: ['placements', boardId],
       queryClient,
       schema: PlacementSchema,
       getKey: (placement) => placement.blockId,
-      queryFn: async () => listPlacementsFn(),
+      queryFn: async () => listPlacementsFn({ data: { boardId } }),
       onInsert: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await insertPlacementFn({ data: mutation.modified })
+          await insertPlacementFn({
+            data: { boardId, placement: mutation.modified },
+          })
         }
       },
       onUpdate: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
           await updatePlacementFn({
-            data: { id: mutation.key, changes: mutation.changes },
+            data: {
+              boardId,
+              id: mutation.key,
+              changes: mutation.changes,
+            },
           })
         }
       },
       onDelete: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await deletePlacementFn({ data: { id: mutation.key } })
+          await deletePlacementFn({ data: { boardId, id: mutation.key } })
         }
       },
     }),

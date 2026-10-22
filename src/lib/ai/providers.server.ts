@@ -127,28 +127,38 @@ function customProviderConfig(): {
   }
 }
 
-/** Check if provider has a key in DB or env. */
-async function checkProviderAvailable(id: AiProviderId): Promise<{ available: boolean; userConfigured: boolean }> {
+/**
+ * Check if provider has a key in DB or env.
+ *
+ * The DB lookup is per user: API keys belong to the account that added them,
+ * so one person's key never silently pays for another person's board. The
+ * environment variables remain a server-wide fallback for self-hosted setups
+ * that have a single operator.
+ */
+async function checkProviderAvailable(
+  id: AiProviderId,
+  userId: string,
+): Promise<{ available: boolean; userConfigured: boolean }> {
   switch (id) {
     case 'gemini': {
-      const dbKey = await getApiKey('gemini')
+      const dbKey = await getApiKey(userId, 'gemini')
       if (dbKey) return { available: true, userConfigured: true }
       return { available: Boolean(geminiEnvKey()), userConfigured: false }
     }
     case 'openai': {
-      const dbKey = await getApiKey('openai')
+      const dbKey = await getApiKey(userId, 'openai')
       if (dbKey) return { available: true, userConfigured: true }
       return { available: Boolean(process.env.OPENAI_API_KEY), userConfigured: false }
     }
     case 'openrouter': {
-      const dbKey = await getApiKey('openrouter')
+      const dbKey = await getApiKey(userId, 'openrouter')
       if (dbKey) return { available: true, userConfigured: true }
       return { available: Boolean(process.env.OPENROUTER_API_KEY), userConfigured: false }
     }
     case 'ollama':
       return { available: true, userConfigured: false }
     case 'custom': {
-      const dbKey = await getApiKey('custom')
+      const dbKey = await getApiKey(userId, 'custom')
       if (dbKey) return { available: true, userConfigured: true }
       return { available: Boolean(process.env.AI_CUSTOM_BASE_URL), userConfigured: false }
     }
@@ -161,27 +171,30 @@ function geminiEnvKey(): string | undefined {
 }
 
 /** Get the decrypted API key for a provider (DB first, then env). */
-async function getProviderKey(id: AiProviderId): Promise<string | undefined> {
+async function getProviderKey(
+  id: AiProviderId,
+  userId: string,
+): Promise<string | undefined> {
   switch (id) {
     case 'gemini': {
-      const dbKey = await getApiKey('gemini')
+      const dbKey = await getApiKey(userId, 'gemini')
       if (dbKey) return decryptApiKey(dbKey.encryptedKey)
       return geminiEnvKey()
     }
     case 'openai': {
-      const dbKey = await getApiKey('openai')
+      const dbKey = await getApiKey(userId, 'openai')
       if (dbKey) return decryptApiKey(dbKey.encryptedKey)
       return process.env.OPENAI_API_KEY
     }
     case 'openrouter': {
-      const dbKey = await getApiKey('openrouter')
+      const dbKey = await getApiKey(userId, 'openrouter')
       if (dbKey) return decryptApiKey(dbKey.encryptedKey)
       return process.env.OPENROUTER_API_KEY
     }
     case 'ollama':
       return undefined
     case 'custom': {
-      const dbKey = await getApiKey('custom')
+      const dbKey = await getApiKey(userId, 'custom')
       if (dbKey) return decryptApiKey(dbKey.encryptedKey)
       return process.env.AI_CUSTOM_API_KEY
     }
@@ -189,25 +202,27 @@ async function getProviderKey(id: AiProviderId): Promise<string | undefined> {
 }
 
 /** Get custom provider base URL (DB first, then env). */
-async function getCustomBaseUrl(): Promise<string | undefined> {
-  const dbKey = await getApiKey('custom')
+async function getCustomBaseUrl(userId: string): Promise<string | undefined> {
+  const dbKey = await getApiKey(userId, 'custom')
   if (dbKey?.baseUrl) return dbKey.baseUrl
   return process.env.AI_CUSTOM_BASE_URL
 }
 
 /** Called at request time so DB/env-driven `available` flags stay fresh. */
-export async function listAiProviders(): Promise<AiProviderInfo[]> {
+export async function listAiProviders(
+  userId: string,
+): Promise<AiProviderInfo[]> {
   const providers: AiProviderInfo[] = []
   const encryptionConfigured = Boolean(process.env.AI_ENCRYPTION_KEY)
 
   for (const p of BUILTIN_PROVIDERS) {
-    const { available, userConfigured } = await checkProviderAvailable(p.id)
+    const { available, userConfigured } = await checkProviderAvailable(p.id, userId)
     providers.push({ ...p, available, userConfigured, encryptionConfigured })
   }
 
   const custom = customProviderConfig()
   if (custom) {
-    const { available, userConfigured } = await checkProviderAvailable('custom')
+    const { available, userConfigured } = await checkProviderAvailable('custom', userId)
     providers.push({
       id: 'custom',
       label: custom.name,
@@ -223,8 +238,11 @@ export async function listAiProviders(): Promise<AiProviderInfo[]> {
   return providers
 }
 
-export async function isProviderAvailable(id: AiProviderId): Promise<boolean> {
-  const { available } = await checkProviderAvailable(id)
+export async function isProviderAvailable(
+  id: AiProviderId,
+  userId: string,
+): Promise<boolean> {
+  const { available } = await checkProviderAvailable(id, userId)
   return available
 }
 
@@ -241,8 +259,9 @@ export interface ResolvedChatConfig {
 export async function resolveAdapter(
   providerId: AiProviderId,
   model: string,
+  userId: string,
 ): Promise<ResolvedChatConfig> {
-  const available = await isProviderAvailable(providerId)
+  const available = await isProviderAvailable(providerId, userId)
   if (!available) {
     const info = BUILTIN_PROVIDERS.find((p) => p.id === providerId)
     const hint = info?.configHint
@@ -256,7 +275,7 @@ export async function resolveAdapter(
     throw new Error('A model must be selected for the active AI provider.')
   }
 
-  const key = await getProviderKey(providerId)
+  const key = await getProviderKey(providerId, userId)
   const maxTokens =
     BUILTIN_PROVIDERS.find((p) => p.id === providerId)?.maxTokens ??
     DEFAULT_MAX_TOKENS
@@ -307,7 +326,7 @@ export async function resolveAdapter(
         modelOptions: { options: { num_predict: maxTokens } },
       }
     case 'custom': {
-      const baseURL = await getCustomBaseUrl()
+      const baseURL = await getCustomBaseUrl(userId)
       if (!baseURL) throw new Error('custom AI provider base URL is not configured')
       return {
         adapter: openaiCompatibleText(model, {
