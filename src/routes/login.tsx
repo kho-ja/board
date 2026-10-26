@@ -45,15 +45,13 @@ function LoginPage() {
           : await registerFn({ data: { email, password, name } })
 
       if (!result.ok) {
-        setError(result.error ?? 'Something went wrong.')
+        setError(result.error ?? 'Something went wrong. Please try again.')
         return
       }
       await navigate({ to: search.redirect ?? '/boards' })
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : 'Something went wrong.',
-      )
-    } finally {
+    } catch {
+        setError('We couldn\'t reach the server — check your connection and try again.')
+      } finally {
       setPending(false)
     }
   }
