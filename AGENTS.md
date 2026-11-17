@@ -11,7 +11,7 @@ Before editing files for a substantial task:
 
 ### Issue tracker
 
-GitHub Issues (`github.com/kho-ja/board`), published with `ready-for-agent` label. Mirrored locally in `.wayfinder/tickets/` with the frontier in `docs/wayfinder-map.md`. See `docs/agents/issue-tracker.md`.
+GitHub Issues (`github.com/kho-ja/board`), published with `ready-for-agent` label. Issue #N = wayfinder ticket N+1. Mirrored locally in `.wayfinder/tickets/` with the frontier in `docs/wayfinder-map.md`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
