@@ -83,7 +83,9 @@ export function BoardSwitcher({ boardId }: { boardId: string }) {
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate({ to: '/boards' })}>
+        <DropdownMenuItem
+          onClick={() => navigate({ to: '/boards', search: { error: undefined } })}
+        >
           <LayoutGrid className="size-4" />
           All boards
         </DropdownMenuItem>

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { BoardRole } from '#/db/schema'
 import {
@@ -13,6 +13,7 @@ import {
   shareBoardFn,
 } from '#/lib/boards/boards.functions'
 import { currentUserFn, logoutFn } from '#/lib/auth/auth.functions'
+import { BOARD_NOT_FOUND } from '#/lib/boards/board-errors'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -69,8 +70,20 @@ function BoardsPage() {
 
   const [newName, setNewName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [redirectError, setRedirectError] = useState<string | null>(
+    search.error ?? null,
+  )
   const [pending, setPending] = useState(false)
   const [sharing, setSharing] = useState<string | null>(null)
+
+  // The $boardId loader lands here with an error param when a board is
+  // missing or inaccessible. Keep the message for this visit, but strip it
+  // from the URL so a refresh or shared link doesn't resurrect the banner.
+  useEffect(() => {
+    if (!search.error) return
+    setRedirectError(search.error)
+    void navigate({ to: '/boards', search: { error: undefined }, replace: true })
+  }, [search.error, navigate])
 
   const boardsQuery = useQuery({
     queryKey: ['boards'],
@@ -82,6 +95,7 @@ function BoardsPage() {
   const createBoard = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    setRedirectError(null)
     setPending(true)
     try {
       const board = await createBoardFn({ data: { name: newName } })
@@ -98,6 +112,7 @@ function BoardsPage() {
   const removeBoard = async (boardId: string) => {
     if (!window.confirm('Delete this board and everything on it?')) return
     setError(null)
+    setRedirectError(null)
     try {
       await deleteBoardFn({ data: { boardId } })
       await queryClient.invalidateQueries({ queryKey: ['boards'] })
@@ -161,14 +176,15 @@ function BoardsPage() {
           </form>
         </div>
 
-        {(search.error === 'board-not-found' || error) && (
+        {(redirectError || error) && (
           <p
             role="alert"
             className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           >
-            {search.error === 'board-not-found'
-              ? 'That board could not be found.'
-              : error}
+            {error ??
+              (redirectError === BOARD_NOT_FOUND
+                ? 'That board could not be found, or you do not have access to it.'
+                : redirectError)}
           </p>
         )}
 

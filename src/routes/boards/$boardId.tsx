@@ -77,6 +77,7 @@ import { getCollections } from '#/collections'
 import { BoardAccessProvider } from '#/components/boards/BoardAccessProvider'
 import { canEditBoard, type BoardRole } from '#/lib/boards/roles'
 import { currentUserFn } from '#/lib/auth/auth.functions'
+import { BOARD_NOT_FOUND } from '#/lib/boards/board-errors'
 import { listBoardsFn } from '#/lib/boards/boards.functions'
 
 export const Route = createFileRoute('/boards/$boardId')({
@@ -90,7 +91,7 @@ export const Route = createFileRoute('/boards/$boardId')({
 
     const boards = await listBoardsFn()
     const board = boards.find((candidate) => candidate.id === params.boardId)
-    if (!board) throw redirect({ to: '/boards', search: { error: 'board-not-found' } })
+    if (!board) throw redirect({ to: '/boards', search: { error: BOARD_NOT_FOUND } })
 
     const collections = getCollections(context.queryClient, board.id)
     await Promise.all([
