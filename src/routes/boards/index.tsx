@@ -42,6 +42,9 @@ import {
 
 export const Route = createFileRoute('/boards/')({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => ({
+    error: typeof search.error === 'string' ? search.error : undefined,
+  }),
   loader: async () => {
     const user = await currentUserFn()
     if (!user) {
@@ -62,6 +65,7 @@ function BoardsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = Route.useLoaderData()
+  const search = Route.useSearch()
 
   const [newName, setNewName] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -157,12 +161,14 @@ function BoardsPage() {
           </form>
         </div>
 
-        {error && (
+        {(search.error === 'board-not-found' || error) && (
           <p
             role="alert"
             className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           >
-            {error}
+            {search.error === 'board-not-found'
+              ? 'That board could not be found.'
+              : error}
           </p>
         )}
 

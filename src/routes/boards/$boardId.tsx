@@ -90,7 +90,7 @@ export const Route = createFileRoute('/boards/$boardId')({
 
     const boards = await listBoardsFn()
     const board = boards.find((candidate) => candidate.id === params.boardId)
-    if (!board) throw redirect({ to: '/boards' })
+    if (!board) throw redirect({ to: '/boards', search: { error: 'board-not-found' } })
 
     const collections = getCollections(context.queryClient, board.id)
     await Promise.all([
