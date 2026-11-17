@@ -65,7 +65,7 @@ Modified tables: all board-scoped content tables (`blocks`, `placements`, `links
 
 - `/login`: sign in / sign up toggle, form validation (email format, password strength, existing-account check for sign-up, wrong-password check for sign-in), submit handler with distinct `pending`, `error`, and `success` states.
 - `/boards`: loader requires `currentUserFn()`; if no user, redirects to `/login`. Board list (`listBoardsFn`) returns boards the current user has membership in, with role label and owner email.
-- `/boards/$boardId`: loader validates user exists and board exists; if board missing, silent redirect to `/boards` (acknowledged rough edge; see ticket #2 in wayfinder).
+- `/boards/$boardId`: loader validates user exists and board exists; if board missing or inaccessible, redirects to `/boards` with `error=board-not-found`, which the list page surfaces as a banner (see ticket #2 in wayfinder).
 - `/` redirects to `/boards`.
 
 ### Board CRUD and sharing (`src/lib/boards/`)
@@ -106,7 +106,7 @@ Modified tables: all board-scoped content tables (`blocks`, `placements`, `links
 - `claimUnclaimedBoard` claims only boards with zero `board_members` rows; conditional update prevents concurrent registration races from both winning.
 - Every board-scoped server function re-checks `requireBoardMember()` using the board id from the server context (`getCurrentBoardId`), not from a potentially tampered client value alone.
 - AI chat is per-board via `localStoragePersistence({ keyPrefix: chatScope(boardId) })` with index (`.index`), active (`.active`), transcripts (`.<threadId>`), and approval state (`.approval.<threadId>`) all scoped.
-- `boards` loader uses `currentUserFn()`; missing user redirects to `/login`; missing board redirects to `/boards` (silent — known gap, see wayfinder ticket #2).
+- `boards` loader uses `currentUserFn()`; missing user redirects to `/login`; missing board redirects to `/boards` with `error=board-not-found` (banner surfaced on the list page — see wayfinder ticket #2).
 - `board_members` unique index `(board_id, user_id)` with role enum (`owner`, `editor`, `viewer`) prevents duplicate memberships.
 - Composite foreign keys `(parent_id, board_id)` on `placements`, `memberships`, `links`, `types`, `views` prevent cross-board references.
 - All collections reload per board via `queryKey` including `boardId`.

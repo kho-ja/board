@@ -11,7 +11,7 @@ Before editing files for a substantial task:
 
 ### Issue tracker
 
-Local-markdown (`.scratch/` / `.wayfinder/`). See `docs/agents/issue-tracker.md`. GitHub remote exists (`github.com/kho-ja/board`) but not used for tracking in this session.
+GitHub Issues (`github.com/kho-ja/board`), published with `ready-for-agent` label. Mirrored locally in `.wayfinder/tickets/` with the frontier in `docs/wayfinder-map.md`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

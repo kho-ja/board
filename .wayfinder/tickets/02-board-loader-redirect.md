@@ -1,9 +1,10 @@
 # Ticket 2 — Board loader silent redirect on missing board
 
 **Type**: task (grilling)  
-**Status**: open  
+**Status**: closed  
 **Priority**: 2  
 **Effort**: trivial
+**Resolution**: 2026-11-17
 
 ## Question
 
