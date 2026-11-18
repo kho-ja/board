@@ -29,9 +29,9 @@ Improve the existing auth and multi-board experience through targeted polish and
 
 Status legend: `open`, `in-progress`, `closed`. Frontier = open, unclaimed tickets with no blockers ahead of them.
 
-1. [Login/signup error surfacing](.wayfinder/tickets/01-login-error-surfacing.md) — open — task — smallest, high user-visible impact
+1. [Login/signup error surfacing](.wayfinder/tickets/01-login-error-surfacing.md) — closed — task — smallest, high user-visible impact
 2. [Board loader silent redirect on missing board](.wayfinder/tickets/02-board-loader-redirect.md) — closed — task — trivial
-3. [Board list stale data / no skeleton](.wayfinder/tickets/03-board-list-stale-data.md) — open — task — small
+3. [Board list stale data / no skeleton](.wayfinder/tickets/03-board-list-stale-data.md) — closed — task — small
 4. [Cookie security (`__Host-`, `secure`)](.wayfinder/tickets/04-cookie-security.md) — open — task — small
 5. [Sign-out client-cache cleanup](.wayfinder/tickets/05-signout-cache-leak.md) — open — task — small
 6. [AskPanel retry after bad provider/model](.wayfinder/tickets/06-askpanel-retry.md) — open — task — small
@@ -49,3 +49,4 @@ Status legend: `open`, `in-progress`, `closed`. Frontier = open, unclaimed ticke
 
 - 2026-10-26 · Login/signup error surfacing — **resolved** (`.wayfinder/tickets/01-login-error-surfacing.md` closed). Specific actionable error now shown on server/network failure; generic fallback retained for unexpected empty errors.
 - 2026-11-17 · Board loader silent redirect on missing board — **resolved** (`.wayfinder/tickets/02-board-loader-redirect.md` closed). Loader now redirects to `/boards?error=board-not-found`; the list page shows "That board could not be found, or you do not have access to it." and strips the param from the URL. Chose the ticket's persistent-banner wording over the 404-vs-permission distinction — the server-side split remains unimplemented and was deliberately left for a future decision.
+- 2026-11-18 · Board list stale data / no skeleton — **resolved** (`c9a364a`, `.wayfinder/tickets/03-board-list-stale-data.md` closed). Extracted `<BoardList />` in `src/components/boards/BoardList.tsx` rendering skeleton cards during active query fetch (`isFetching`) rather than stale boards; empty and populated states preserved; verified by component unit tests in `src/components/boards/BoardList.test.tsx`.
