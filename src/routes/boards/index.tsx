@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 
 import type { BoardRole } from '#/db/schema'
+import { BoardList } from '#/components/boards/BoardList'
 import {
   createBoardFn,
   deleteBoardFn,
@@ -14,7 +15,6 @@ import {
 } from '#/lib/boards/boards.functions'
 import { currentUserFn, logoutFn } from '#/lib/auth/auth.functions'
 import { BOARD_NOT_FOUND } from '#/lib/boards/board-errors'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -55,12 +55,6 @@ export const Route = createFileRoute('/boards/')({
   },
   component: BoardsPage,
 })
-
-const ROLE_LABEL: Record<BoardRole, string> = {
-  owner: 'Owner',
-  editor: 'Can edit',
-  viewer: 'View only',
-}
 
 function BoardsPage() {
   const navigate = useNavigate()
@@ -188,71 +182,12 @@ function BoardsPage() {
           </p>
         )}
 
-        {boardsQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading boards…</p>
-        ) : boards.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <p className="text-sm font-medium text-foreground">No boards yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create your first board to start organising things.
-            </p>
-          </div>
-        ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {boards.map((board) => (
-              <li
-                key={board.id}
-                className="flex flex-col rounded-2xl border border-border bg-card p-5 transition-shadow hover:shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    to="/boards/$boardId"
-                    params={{ boardId: board.id }}
-                    className="text-base font-bold text-foreground hover:underline"
-                  >
-                    {board.name}
-                  </Link>
-                  <Badge variant="secondary">{ROLE_LABEL[board.role]}</Badge>
-                </div>
-
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {board.ownerEmail ? `Owner ${board.ownerEmail}` : 'Shared board'}
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Link
-                    to="/boards/$boardId"
-                    params={{ boardId: board.id }}
-                  >
-                    <Button type="button" variant="outline" size="sm">
-                      Open
-                    </Button>
-                  </Link>
-                  {board.role === 'owner' && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSharing(board.id)}
-                      >
-                        Share
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void removeBoard(board.id)}
-                      >
-                        Delete
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <BoardList
+          fetching={boardsQuery.isFetching}
+          boards={boards}
+          onShare={setSharing}
+          onDelete={(boardId) => void removeBoard(boardId)}
+        />
       </div>
 
       <ShareDialog
