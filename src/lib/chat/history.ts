@@ -56,6 +56,33 @@ export function threadKey(boardId: string, threadId: string): string {
   return `${chatScope(boardId)}${threadId}`
 }
 
+/**
+ * Remove all Ask chat state across all boards from storage (used on logout
+ * to ensure chat history does not leak on shared machines).
+ */
+export function clearChatStorage(
+  storage?: Pick<Storage, 'length' | 'key' | 'removeItem'>,
+): void {
+  try {
+    const store =
+      storage ?? (typeof localStorage !== 'undefined' ? localStorage : undefined)
+    if (!store) return
+
+    const keysToRemove: string[] = []
+    for (let i = 0; i < store.length; i++) {
+      const key = store.key(i)
+      if (key && (key.startsWith(CHAT_PREFIX) || key === LEGACY_CHAT_KEY)) {
+        keysToRemove.push(key)
+      }
+    }
+    for (const key of keysToRemove) {
+      store.removeItem(key)
+    }
+  } catch {
+    // Storage access may fail in restricted/sandboxed environments.
+  }
+}
+
 export interface ThreadMeta {
   id: string
   title: string

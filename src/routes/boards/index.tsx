@@ -13,7 +13,8 @@ import {
   setMemberRoleFn,
   shareBoardFn,
 } from '#/lib/boards/boards.functions'
-import { currentUserFn, logoutFn } from '#/lib/auth/auth.functions'
+import { currentUserFn } from '#/lib/auth/auth.functions'
+import { signOut } from '#/lib/auth/auth.client'
 import { BOARD_NOT_FOUND } from '#/lib/boards/board-errors'
 import { Button } from '@/components/ui/button'
 import {
@@ -115,10 +116,8 @@ function BoardsPage() {
     }
   }
 
-  const signOut = async () => {
-    await logoutFn({ data: undefined })
-    await queryClient.invalidateQueries()
-    await navigate({ to: '/login', search: { redirect: undefined } })
+  const handleSignOut = async () => {
+    await signOut({ queryClient, navigate })
   }
 
   return (
@@ -138,7 +137,7 @@ function BoardsPage() {
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {user.name || user.email}
             </span>
-            <Button type="button" variant="outline" size="sm" onClick={signOut}>
+            <Button type="button" variant="outline" size="sm" onClick={() => void handleSignOut()}>
               Sign out
             </Button>
           </div>

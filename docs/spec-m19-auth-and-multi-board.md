@@ -35,7 +35,7 @@ Key behaviors:
 5. As a board owner, I want to create new boards with a name, so I can separate different projects.
 6. As a user, I want to share a board with another registered user by their email, assigning them owner/editor/viewer roles, so collaboration is controlled.
 7. As a viewer on a shared board, I want to see the board's content but have read-only AI tool access, so I can observe without making changes.
-8. As a user, I want to sign out and have my session invalidated server-side, so my account can't be replayed if the cookie leaks.
+8. As a user, I want to sign out and have my session invalidated server-side and client-side caches (collections, query data, and chat history in localStorage) cleared, so my account and conversations can't leak on a shared device.
 9. As a user, I want the AI chat history to stay with the board it's about, so switching boards doesn't leak another board's content to the new board's AI tools.
 10. As a shared user, I want to see the list of people with access to a board and change/remove their roles, so I know who's on the board.
 11. As a user, I want the board page URL to include the board id (`/boards/$boardId`), so linking to a board is stable and direct.

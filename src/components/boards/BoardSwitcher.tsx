@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Check, ChevronDown, LayoutGrid, LogOut } from 'lucide-react'
 
-import { logoutFn } from '#/lib/auth/auth.functions'
+import { signOut } from '#/lib/auth/auth.client'
 import { listBoardsFn } from '#/lib/boards/boards.functions'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,10 +32,8 @@ export function BoardSwitcher({ boardId }: { boardId: string }) {
 
   const current = boards.find((board) => board.id === boardId)
 
-  const signOut = async () => {
-    await logoutFn({ data: undefined })
-    await queryClient.invalidateQueries()
-    await navigate({ to: '/login', search: { redirect: undefined } })
+  const handleSignOut = async () => {
+    await signOut({ queryClient, navigate })
   }
 
   return (
@@ -89,7 +87,7 @@ export function BoardSwitcher({ boardId }: { boardId: string }) {
           <LayoutGrid className="size-4" />
           All boards
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void signOut()}>
+        <DropdownMenuItem onClick={() => void handleSignOut()}>
           <LogOut className="size-4" />
           Sign out
         </DropdownMenuItem>

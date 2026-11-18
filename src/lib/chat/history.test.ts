@@ -25,6 +25,7 @@ import {
   threadKey,
   threadMetaFromMessages,
   threadTitle,
+  clearChatStorage,
 } from './history'
 
 function makeStorage() {
@@ -33,6 +34,10 @@ function makeStorage() {
     getItem: (k: string) => map.get(k) ?? null,
     setItem: (k: string, v: string) => void map.set(k, v),
     removeItem: (k: string) => void map.delete(k),
+    get length() {
+      return map.size
+    },
+    key: (i: number) => Array.from(map.keys())[i] ?? null,
   }
 }
 
@@ -379,5 +384,28 @@ describe('index storage keying', () => {
     expect(UNSCOPED_INDEX_KEY).toBe(`${CHAT_PREFIX}index`)
     expect(UNSCOPED_ACTIVE_KEY).toBe(`${CHAT_PREFIX}active`)
     expect(LEGACY_CHAT_KEY).toContain('khoja-board-ask')
+  })
+})
+
+describe('clearChatStorage', () => {
+  it('clears all board chat keys and legacy keys while preserving unrelated keys', () => {
+    const storage = makeStorage()
+    storage.setItem('khoja.chat.board-1.thread-1', 'data1')
+    storage.setItem('khoja.chat.board-1.index', 'data2')
+    storage.setItem('khoja.chat.board-2.active', 'data3')
+    storage.setItem('khoja.chat.board-1.approval.t1', 'data4')
+    storage.setItem('tanstack-ai:khoja-board-ask', 'legacy-data')
+    storage.setItem('theme', 'dark')
+    storage.setItem('other-key', 'keep-me')
+
+    clearChatStorage(storage)
+
+    expect(storage.getItem('khoja.chat.board-1.thread-1')).toBeNull()
+    expect(storage.getItem('khoja.chat.board-1.index')).toBeNull()
+    expect(storage.getItem('khoja.chat.board-2.active')).toBeNull()
+    expect(storage.getItem('khoja.chat.board-1.approval.t1')).toBeNull()
+    expect(storage.getItem('tanstack-ai:khoja-board-ask')).toBeNull()
+    expect(storage.getItem('theme')).toBe('dark')
+    expect(storage.getItem('other-key')).toBe('keep-me')
   })
 })

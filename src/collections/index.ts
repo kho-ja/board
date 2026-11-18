@@ -48,3 +48,11 @@ export function getCollections(
   perClient.set(boardId, collections)
   return collections
 }
+
+/** Clear cached live collections for a given queryClient (e.g. on logout). */
+export function clearCollectionsCache(queryClient?: QueryClient): void {
+  if (queryClient) {
+    collectionCache.get(queryClient)?.clear()
+  }
+}
+
