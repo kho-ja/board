@@ -57,7 +57,7 @@ Modified tables: all board-scoped content tables (`blocks`, `placements`, `links
 ### Auth layer (`src/lib/auth/`)
 
 - `password.server.ts`: `hashPassword` / `verifyPassword` using `node:crypto` scrypt, canonicalizes to NFKC before hashing, handles corrupt digests gracefully (returns false, never throws).
-- `session.server.ts`: random token stored in httpOnly cookie (`httpOnly`, `sameSite: 'lax'`, `secure` only in production); DB stores SHA-256 hash, not the raw token, so a DB leak does not allow replay.
+- `session.server.ts`: random token stored in httpOnly cookie (`__Host-` prefix with `sameSite: 'none'` and `secure: true` in production; standard `kj_session` with `sameSite: 'lax'` and `secure: false` in dev over HTTP); DB stores SHA-256 hash, not the raw token, so a DB leak does not allow replay.
 - `guards.server.ts`: single authorization gate (`requireBoardMember`, `requireBoardRead`, `requireUser`) used by every board-scoped server function.
 - `auth.functions.ts`: `registerFn` creates user → creates session → claims unclaimed board (`claimUnclaimedBoard` with conditional update to prevent concurrent race). `loginFn` uses constant-time comparison (`timingSafeEqual`) and a dummy hash path to prevent timing attacks.
 
@@ -101,7 +101,7 @@ Modified tables: all board-scoped content tables (`blocks`, `placements`, `links
 
 ## Implementation Decisions (key)
 
-- Auth uses `node:crypto` scrypt (no new dependency); session cookie uses SHA-256 hash (replay protection on DB leak); cookie `secure: false` in dev, `lax` same-site everywhere.
+- Auth uses `node:crypto` scrypt (no new dependency); session cookie uses SHA-256 hash (replay protection on DB leak); cookie uses `__Host-` prefix with `sameSite: 'none'` and `secure: true` in production, and `secure: false` with `lax` same-site in dev over HTTP.
 - `boards.owner_id` is `ON DELETE SET NULL`, not `CASCADE` — deleting an account must never destroy shared boards.
 - `claimUnclaimedBoard` claims only boards with zero `board_members` rows; conditional update prevents concurrent registration races from both winning.
 - Every board-scoped server function re-checks `requireBoardMember()` using the board id from the server context (`getCurrentBoardId`), not from a potentially tampered client value alone.

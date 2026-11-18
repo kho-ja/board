@@ -13,7 +13,21 @@ import { sessions, users } from '#/db/schema'
  * cannot be replayed as a live session.
  */
 
-export const SESSION_COOKIE = 'kj_session'
+export const DEV_SESSION_COOKIE = 'kj_session'
+export const PROD_SESSION_COOKIE = '__Host-kj_session'
+
+/**
+ * In production, prefix with `__Host-` to bind the cookie to the exact host
+ * and prohibit domain overrides or subdomain tampering.
+ * In development, drop the prefix so local HTTP works without browser rejection.
+ */
+export function getSessionCookieName(
+  env: string = process.env.NODE_ENV ?? 'development',
+): string {
+  return env === 'production' ? PROD_SESSION_COOKIE : DEV_SESSION_COOKIE
+}
+
+export const SESSION_COOKIE = getSessionCookieName()
 
 /** 30 days. */
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
@@ -28,12 +42,18 @@ export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-function cookieOptions() {
+export function cookieOptions(
+  env: string = process.env.NODE_ENV ?? 'development',
+) {
+  const isProd = env === 'production'
   return {
     httpOnly: true,
-    sameSite: 'lax' as const,
+    // In production, pair __Host- with SameSite=None and Secure=true.
+    // In dev over HTTP, keep Secure=false (otherwise browsers drop the cookie)
+    // and SameSite=Lax (browsers reject SameSite=None without Secure).
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
     path: '/',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProd,
   }
 }
 
@@ -44,7 +64,8 @@ export async function createSession(userId: string): Promise<void> {
 
   await db.insert(sessions).values({ id: hashToken(token), userId, expiresAt })
 
-  setCookie(SESSION_COOKIE, token, {
+  const cookieName = getSessionCookieName()
+  setCookie(cookieName, token, {
     ...cookieOptions(),
     maxAge: Math.floor(SESSION_TTL_MS / 1000),
   })
@@ -52,7 +73,8 @@ export async function createSession(userId: string): Promise<void> {
 
 /** The signed-in user for this request, or null. */
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const token = getCookie(SESSION_COOKIE)
+  const cookieName = getSessionCookieName()
+  const token = getCookie(cookieName) ?? getCookie(DEV_SESSION_COOKIE)
   if (!token) return null
 
   const rows = await db
@@ -67,7 +89,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   if (row.session.expiresAt.getTime() <= Date.now()) {
     await db.delete(sessions).where(eq(sessions.id, row.session.id))
-    setCookie(SESSION_COOKIE, '', { ...cookieOptions(), maxAge: 0 })
+    setCookie(cookieName, '', { ...cookieOptions(), maxAge: 0 })
+    if (cookieName !== DEV_SESSION_COOKIE) {
+      setCookie(DEV_SESSION_COOKIE, '', { ...cookieOptions(), maxAge: 0 })
+    }
     return null
   }
 
@@ -76,11 +101,15 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
 /** End this request's session and clear the cookie. */
 export async function destroySession(): Promise<void> {
-  const token = getCookie(SESSION_COOKIE)
+  const cookieName = getSessionCookieName()
+  const token = getCookie(cookieName) ?? getCookie(DEV_SESSION_COOKIE)
   if (token) {
     await db.delete(sessions).where(eq(sessions.id, hashToken(token)))
   }
-  setCookie(SESSION_COOKIE, '', { ...cookieOptions(), maxAge: 0 })
+  setCookie(cookieName, '', { ...cookieOptions(), maxAge: 0 })
+  if (cookieName !== DEV_SESSION_COOKIE) {
+    setCookie(DEV_SESSION_COOKIE, '', { ...cookieOptions(), maxAge: 0 })
+  }
 }
 
 /** Drop every session belonging to a user (used when an account is removed). */
