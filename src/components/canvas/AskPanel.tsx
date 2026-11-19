@@ -113,6 +113,26 @@ function describeFailure(error: unknown): string {
   return String(error)
 }
 
+/**
+ * Returns true when the failure is likely caused by a bad provider/model
+ * configuration (wrong API key, rate limit, unknown model) rather than a
+ * transient network error — so the UI can offer an "Open settings" shortcut
+ * alongside "Try again".
+ */
+function isProviderError(error: unknown): boolean {
+  const msg = describeFailure(error).toLowerCase()
+  return (
+    msg.includes('api key') ||
+    msg.includes('rate limit') ||
+    msg.includes('429') ||
+    msg.includes('401') ||
+    msg.includes('403') ||
+    msg.includes('no ai provider') ||
+    msg.includes('model') ||
+    msg.includes('provider')
+  )
+}
+
 function summarizeToolCallOutput(name: string, parsed: unknown): string {
   if (
     name === AI_TOOL_NAMES.context &&
@@ -583,6 +603,20 @@ function AskThread({
         {lastError && (
           <div className="ask-error" role="alert">
             <span className="ask-error-text">{describeFailure(lastError)}</span>
+            {isProviderError(lastError) && onOpenSettings && (
+              <p className="ask-error-hint">
+                Check your provider and model in{' '}
+                <Button
+                  type="button"
+                  variant="link"
+                  className="ask-error-settings-link"
+                  onClick={onOpenSettings}
+                >
+                  Ask settings
+                </Button>
+                .
+              </p>
+            )}
             {/* A failed run leaves no way back otherwise, and a stale pending
                 approval in particular cannot be cleared from here. */}
             <Button
