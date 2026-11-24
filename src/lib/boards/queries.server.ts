@@ -219,33 +219,37 @@ export async function claimUnclaimedBoard(userId: string): Promise<string | null
     .limit(10)
 
   for (const candidate of candidates) {
-    const members = await db
-      .select({ userId: boardMembers.userId })
-      .from(boardMembers)
-      .where(eq(boardMembers.boardId, candidate.id))
-      .limit(1)
+    const claimedId = await db.transaction(async (tx) => {
+      const members = await tx
+        .select({ userId: boardMembers.userId })
+        .from(boardMembers)
+        .where(eq(boardMembers.boardId, candidate.id))
+        .limit(1)
 
-    if (members.length > 0) continue
+      if (members.length > 0) return null
 
-    const claimed = await db
-      .update(boards)
-      .set({ ownerId: userId, updatedAt: new Date() })
-      .where(and(eq(boards.id, candidate.id), isNull(boards.ownerId)))
-      .returning({ id: boards.id })
+      const claimed = await tx
+        .update(boards)
+        .set({ ownerId: userId, updatedAt: new Date() })
+        .where(and(eq(boards.id, candidate.id), isNull(boards.ownerId)))
+        .returning({ id: boards.id })
 
-    if (claimed.length === 0) continue
+      if (claimed.length === 0) return null
 
-    await db
-      .insert(boardMembers)
-      .values({
-        boardId: candidate.id,
-        userId,
-        role: 'owner',
-        createdAt: new Date(),
-      })
-      .onConflictDoNothing()
+      await tx
+        .insert(boardMembers)
+        .values({
+          boardId: candidate.id,
+          userId,
+          role: 'owner',
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing()
 
-    return candidate.id
+      return candidate.id
+    })
+
+    if (claimedId) return claimedId
   }
 
   return null
