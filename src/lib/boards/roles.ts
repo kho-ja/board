@@ -8,6 +8,14 @@
 
 export type BoardRole = 'owner' | 'editor' | 'viewer'
 
+export const BOARD_ROLES = ['owner', 'editor', 'viewer'] as const
+
+export function isBoardRole(value: unknown): value is BoardRole {
+  return (
+    value === 'owner' || value === 'editor' || value === 'viewer'
+  )
+}
+
 /** Roles ordered from least to most privileged. */
 export const BOARD_ROLE_RANK: Record<BoardRole, number> = {
   viewer: 1,

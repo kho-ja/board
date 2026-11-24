@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import type { BoardRole } from '#/lib/boards/roles'
+import { isBoardRole, type BoardRole } from '#/lib/boards/roles'
 
 import { requireBoardOwner, requireBoardRead, requireUser } from '#/lib/auth/guards.server'
 import { findUserByEmail } from '#/lib/auth/users.server'
@@ -69,6 +69,10 @@ export const shareBoardFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireBoardOwner(data.boardId)
 
+    if (!isBoardRole(data.role) || data.role === 'owner') {
+      throw new Error('Unknown role.')
+    }
+
     const email = data.email?.trim() ?? ''
     if (!email || !email.includes('@')) {
       throw new Error('Enter a valid email address.')
@@ -91,6 +95,10 @@ export const setMemberRoleFn = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const { user } = await requireBoardOwner(data.boardId)
+
+    if (!isBoardRole(data.role)) {
+      throw new Error('Unknown role.')
+    }
 
     if (data.role !== 'owner') {
       const target = await getBoardMember(data.boardId, data.userId)

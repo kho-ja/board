@@ -13,6 +13,7 @@ import {
   setMemberRoleFn,
   shareBoardFn,
 } from '#/lib/boards/boards.functions'
+import { isBoardRole } from '#/lib/boards/roles'
 import { currentUserFn } from '#/lib/auth/auth.functions'
 import { signOut } from '#/lib/auth/auth.client'
 import { BOARD_NOT_FOUND } from '#/lib/boards/board-errors'
@@ -224,6 +225,10 @@ function ShareDialog({
     event.preventDefault()
     if (!boardId) return
     setError(null)
+    if (!isBoardRole(role) || (role !== 'editor' && role !== 'viewer')) {
+      setError('Unknown role.')
+      return
+    }
     setPending(true)
     try {
       await shareBoardFn({ data: { boardId, email, role } })
@@ -240,6 +245,10 @@ function ShareDialog({
   const changeRole = async (userId: string, next: BoardRole) => {
     if (!boardId) return
     setError(null)
+    if (!isBoardRole(next)) {
+      setError('Unknown role.')
+      return
+    }
     try {
       await setMemberRoleFn({ data: { boardId, userId, role: next } })
       await membersQuery.refetch()
@@ -296,7 +305,9 @@ function ShareDialog({
             <Label htmlFor="share-role">Role</Label>
             <Select
               value={role}
-              onValueChange={(value) => setRole(value as BoardRole)}
+              onValueChange={(value) => {
+                if (isBoardRole(value)) setRole(value)
+              }}
             >
               <SelectTrigger id="share-role" className="w-full">
                 <SelectValue />
@@ -341,9 +352,9 @@ function ShareDialog({
               <div className="flex items-center gap-2">
                 <Select
                   value={member.role}
-                  onValueChange={(value) =>
-                    void changeRole(member.userId, value as BoardRole)
-                  }
+                  onValueChange={(value) => {
+                    if (isBoardRole(value)) void changeRole(member.userId, value)
+                  }}
                 >
                   <SelectTrigger className="w-28" size="sm">
                     <SelectValue />
