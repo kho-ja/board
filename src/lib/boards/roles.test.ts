@@ -4,6 +4,7 @@ import {
   BOARD_ROLE_RANK,
   canAdministerBoard,
   canEditBoard,
+  isBoardRole,
   roleAtLeast,
 } from './roles'
 
@@ -23,6 +24,16 @@ describe('board roles', () => {
     expect(canAdministerBoard('owner')).toBe(true)
     expect(canAdministerBoard('editor')).toBe(false)
     expect(canAdministerBoard('viewer')).toBe(false)
+  })
+
+  it('accepts only known board roles', () => {
+    expect(isBoardRole('owner')).toBe(true)
+    expect(isBoardRole('editor')).toBe(true)
+    expect(isBoardRole('viewer')).toBe(true)
+    expect(isBoardRole('admin')).toBe(false)
+    expect(isBoardRole('')).toBe(false)
+    expect(isBoardRole(null)).toBe(false)
+    expect(isBoardRole(undefined)).toBe(false)
   })
 })
 
