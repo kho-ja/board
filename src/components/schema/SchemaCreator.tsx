@@ -104,7 +104,7 @@ export function SchemaCreator({
 
     const savedSchema: SchemaDef = {
       id: schema?.id ?? crypto.randomUUID(),
-      name: trimmedName,
+      name: trimmedName.slice(0, 64),
       fields: validFields.map((f) => ({
         id: f.id,
         name: f.name.trim(),
@@ -148,6 +148,7 @@ export function SchemaCreator({
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
+              maxLength={64}
             />
           </div>
 
