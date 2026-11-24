@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 
 import { isBoardRole, type BoardRole } from '#/lib/boards/roles'
 
-import { requireBoardOwner, requireBoardRead, requireUser } from '#/lib/auth/guards.server'
+import { requireBoardAccess, requireBoardOwner, requireUser } from '#/lib/auth/guards.server'
 import { findUserByEmail } from '#/lib/auth/users.server'
 
 import {
@@ -58,7 +58,9 @@ export const deleteBoardFn = createServerFn({ method: 'POST' })
 export const listBoardMembersFn = createServerFn({ method: 'GET' })
   .validator((input: { boardId: string }) => input)
   .handler(async ({ data }) => {
-    await requireBoardRead(data.boardId)
+    // Members and their emails are visible to people who can collaborate on or
+    // administer the board; read-only viewers do not need the full roster.
+    await requireBoardAccess(data.boardId, 'editor')
     return await listBoardMembers(data.boardId)
   })
 
