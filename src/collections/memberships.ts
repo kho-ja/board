@@ -10,30 +10,39 @@ import {
 } from '#/db/queries.functions'
 import { MembershipSchema } from '#/types/schemas'
 
-export function createMembershipsCollection(queryClient: QueryClient) {
+export function createMembershipsCollection(
+  queryClient: QueryClient,
+  boardId: string,
+) {
   return createCollection(
     queryCollectionOptions({
-      id: 'memberships',
-      queryKey: ['memberships'],
+      id: `memberships:${boardId}`,
+      queryKey: ['memberships', boardId],
       queryClient,
       schema: MembershipSchema,
       getKey: (membership) => membership.id,
-      queryFn: async () => listMembershipsFn(),
+      queryFn: async () => listMembershipsFn({ data: { boardId } }),
       onInsert: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await insertMembershipFn({ data: mutation.modified })
+          await insertMembershipFn({
+            data: { boardId, membership: mutation.modified },
+          })
         }
       },
       onUpdate: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
           await updateMembershipFn({
-            data: { id: mutation.key, changes: mutation.changes },
+            data: {
+              boardId,
+              id: mutation.key,
+              changes: mutation.changes,
+            },
           })
         }
       },
       onDelete: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await deleteMembershipFn({ data: { id: mutation.key } })
+          await deleteMembershipFn({ data: { boardId, id: mutation.key } })
         }
       },
     }),

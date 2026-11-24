@@ -11,10 +11,13 @@ import { CHAT_PREFIX } from './history'
  * indefinitely. This module gives every approval a wall-clock lifetime.
  *
  * First-seen times are stored per thread as one `interruptId -> epoch` map
- * under `khoja.chat.approval.<threadId>` — the same localStorage the chat
- * persistence already uses, best-effort like the rest of it. Keying on the
- * interrupt id is safe because ids derive from the tool-call id, which is part
- * of the persisted message, so a reload sees the same id.
+ * under `khoja.chat.<boardId>.approval.<threadId>` — the same localStorage the
+ * chat persistence already uses, best-effort like the rest of it. Keying on
+ * the interrupt id is safe because ids derive from the tool-call id, which is
+ * part of the persisted message, so a reload sees the same id.
+ *
+ * The board is part of the key so that everything belonging to a board lives
+ * under one namespace — the same rule the conversations themselves follow.
  *
  * TTL choice: 24h. An approval is a question about a board mutation; a day
  * later the board has likely moved on and the args deserve a fresh run rather
@@ -25,8 +28,8 @@ import { CHAT_PREFIX } from './history'
 export const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000
 
 /** Per-thread storage key holding the interruptId -> first-seen map. */
-export function approvalSeenKey(threadId: string): string {
-  return `${CHAT_PREFIX}approval.${threadId}`
+export function approvalSeenKey(boardId: string, threadId: string): string {
+  return `${CHAT_PREFIX}${boardId}.approval.${threadId}`
 }
 
 /** The `localStorage` surface these functions need (injectable for tests). */
@@ -40,11 +43,12 @@ function defaultStorage(): ApprovalSeenStorage {
 }
 
 function readMap(
+  boardId: string,
   threadId: string,
   storage: ApprovalSeenStorage,
 ): Record<string, number> {
   try {
-    const raw = storage.getItem(approvalSeenKey(threadId))
+    const raw = storage.getItem(approvalSeenKey(boardId, threadId))
     if (!raw) return {}
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
@@ -59,12 +63,16 @@ function readMap(
 }
 
 function writeMap(
+  boardId: string,
   threadId: string,
   map: Record<string, number>,
   storage: ApprovalSeenStorage,
 ): void {
   try {
-    storage.setItem(approvalSeenKey(threadId), JSON.stringify(map))
+    storage.setItem(
+      approvalSeenKey(boardId, threadId),
+      JSON.stringify(map),
+    )
   } catch {
     // best-effort, mirroring the chat persistence layer
   }
@@ -90,6 +98,7 @@ export interface ApprovalTrackResult {
  * first see the card, so a fresh pause always gets the full TTL.
  */
 export function trackApproval(
+  boardId: string,
   threadId: string,
   interruptId: string,
   options: ApprovalTrackOptions = {},
@@ -98,13 +107,13 @@ export function trackApproval(
   const now = options.now ?? Date.now()
   const ttl = options.ttl ?? APPROVAL_TTL_MS
 
-  const map = readMap(threadId, storage)
+  const map = readMap(boardId, threadId, storage)
   const known = map[interruptId]
   if (typeof known === 'number') {
-    return { firstSeen: known, expired: now - known >= ttl }
+    return { firstSeen: known, expired: known === 0 || now - known >= ttl }
   }
   map[interruptId] = now
-  writeMap(threadId, map, storage)
+  writeMap(boardId, threadId, map, storage)
   return { firstSeen: now, expired: false }
 }
 
@@ -116,12 +125,13 @@ export function trackApproval(
  * indistinguishable from "not hydrated yet" and must not wipe the map.
  */
 export function pruneApprovals(
+  boardId: string,
   threadId: string,
   liveIds: Iterable<string>,
   options: { storage?: ApprovalSeenStorage } = {},
 ): void {
   const storage = options.storage ?? defaultStorage()
-  const map = readMap(threadId, storage)
+  const map = readMap(boardId, threadId, storage)
   const live = new Set(liveIds)
   const next: Record<string, number> = {}
   let changed = false
@@ -130,5 +140,33 @@ export function pruneApprovals(
     else changed = true
   }
   if (Object.keys(map).length !== Object.keys(next).length) changed = true
-  if (changed) writeMap(threadId, next, storage)
+  if (changed) writeMap(boardId, threadId, next, storage)
+}
+
+/**
+ * Force pending approvals to be treated as expired on the next observation.
+ *
+ * Used when a run/tab is abandoned before the server can acknowledge the
+ * approval (for example on unexpected tab close): the interrupt card may remain
+ * in persisted chat state, but this ensures the client will cancel it as stale
+ * instead of retrying a dead run indefinitely.
+ */
+export function expireApprovalsNow(
+  boardId: string,
+  threadId: string,
+  liveIds: Iterable<string>,
+  options: { storage?: ApprovalSeenStorage } = {},
+): void {
+  const storage = options.storage ?? defaultStorage()
+  const map = readMap(boardId, threadId, storage)
+  const live = [...liveIds]
+  if (live.length === 0) return
+  let changed = false
+  for (const id of live) {
+    if (map[id] !== 0) {
+      map[id] = 0
+      changed = true
+    }
+  }
+  if (changed) writeMap(boardId, threadId, map, storage)
 }

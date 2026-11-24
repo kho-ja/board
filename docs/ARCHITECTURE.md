@@ -1,14 +1,27 @@
 # Architecture
 
-> Status: **M0–M18 complete** — full v1 scope per START_PLAN.md. TanStack Start,
-> the Postgres data path, the pan/zoom/drag infinite canvas, text/file/group/object
-> blocks, views, typed connections + diagrams, and the Ask AI panel are all in place,
-> tested, and live-verified.
+> Status: **M0–M19 complete** — full v1 scope per START_PLAN.md, plus the auth
+> layer and multi-board isolation. TanStack Start, the Postgres data path, the
+> pan/zoom/drag infinite canvas, text/file/group/object blocks, views, typed
+> connections + diagrams, the Ask AI panel, accounts, and per-user boards are
+> all in place, tested, and live-verified.
 
 ## Current state
 
 - TanStack Start scaffold (React 19, Vite via Start) with `src/routes/` file-based
   routing, TanStack Query + DB collections wired in the root provider.
+- **M19 — auth + multi-board isolation:** email + password accounts (scrypt
+  via `node:crypto`), server sessions in an httpOnly cookie, and boards as
+  first-class units of isolation. `users`, `sessions`, `boards` and
+  `board_members` (`owner` / `editor` / `viewer`) sit alongside the board-scoped
+  content tables, which all carry a `board_id`; the child tables reference
+  their block through a composite `(block_id, board_id)` foreign key so a
+  placement or link can never cross a board boundary. One gate
+  (`src/lib/auth/guards.server.ts`) re-checks the caller's role on every
+  board-scoped server function, because the board id arrives from the client.
+  The board route is `/boards/$boardId` (collections are created per board),
+  `/boards` is the list, `/login` signs in, and `/` forwards to the list. API
+  keys are per user, and the Ask tools are built per request against one board.
 - M1 data path complete and verified: Postgres `kho_ja` DB with `blocks`,
   `placements`, `memberships`, `types`, `views`, `links`, `diagrams` tables;
   server-only Drizzle query helpers (`src/db/queries.server.ts`) around the
@@ -51,7 +64,7 @@
 - **Monorepo** rooted at the repository root. The exact workspace flavor
   (pnpm workspaces vs. a single app with clean module separation) is an *open
   question* — see DECISIONS.md (OQ-6).
-- **Future-only** (not in v1): authentication, real-time multi-user collaboration,
+- **Future-only** (not in v1): real-time multi-user collaboration,
   ElectricSQL sync, a publishable npm package (see DECISIONS.md).
 
 ## Stack (full-send TanStack, client + server + PostgreSQL)
@@ -117,8 +130,8 @@ Group      # e.g. File Group: holds member references (block <-> group membershi
 - **Deleting a File Group** removes only that membership reference; members with
   independent placements (standalone / other groups) keep them, members with none
   become unplaced (see DECISIONS.md).
-- **Single board in v1**, but board/project is a first-class unit for later
-  multi-project navigation.
+- **Many boards per user**, each a unit of isolation, shared through explicit
+  memberships (`owner` / `editor` / `viewer`).
 
 
 ## External services

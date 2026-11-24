@@ -158,6 +158,27 @@ things are done before they are done.
   picker. Verified live: migration, multi-thread create/switch/delete,
   cross-thread search + jump, reload persistence, panel/dock geometry swap,
   Ctrl+I / × close.
+- **M19 — auth layer and multi-board isolation (email + password):** accounts
+  (`users`), hashed passwords (scrypt via `node:crypto`) and server sessions in
+  an httpOnly cookie; boards as first-class units (`boards` + `board_members`
+  with `owner` / `editor` / `viewer` roles); every board-scoped table carries a
+  `board_id`, and the child tables reference their block through a composite
+  `(block_id, board_id)` foreign key so a placement or link cannot cross a
+  board boundary. One authorisation gate
+  (`src/lib/auth/guards.server.ts`) re-checks the caller's role on every
+  board-scoped server function, because the board id comes from the client. The
+  board route moved to `/boards/$boardId` with a board switcher in the top bar
+  and a board list at `/boards`; the TanStack DB collections are now created
+  per board. API keys became per-user, and the Ask tools are built per request
+  against one board. Ask *history* is board-scoped too: conversations, the
+  thread index, the active thread and the pending-approval state all live
+  under `khoja.chat.<boardId>.*`, so a conversation started on one board never
+  appears — or keeps sending the old board's content back to the model — on
+  another. Conversations from before the split are adopted by the first board
+  opened rather than dropped. Verified live: sign-up, sign-in, board creation
+  and switching, a second account seeing an empty board list, a shared board
+  opening read-only for a viewer, reads/writes on a foreign board being
+  rejected server-side, and one board's chat history staying out of another's.
 
 ## Next (in rough order)
 
@@ -169,8 +190,6 @@ things are done before they are done.
 
 ## Future ideas (do not pretend these exist yet)
 
-- Authentication (login) — deferred deliberately; "anyone can use freely" was
-  raised, but login is not a v1 requirement.
 - Real-time collaboration (accepted as eventually desirable, "too hard" for now).
 - A publishable npm package to build a community — extracted only *after* a
   stable, proven core exists (product-first, package-later).

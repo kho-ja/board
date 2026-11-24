@@ -2,15 +2,18 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { ChatPersistedState, UIMessage } from '@tanstack/ai-client'
 import {
-  CHAT_ACTIVE_KEY,
-  CHAT_INDEX_KEY,
   CHAT_PREFIX,
   DEFAULT_TITLE,
   LEGACY_CHAT_KEY,
+  UNSCOPED_ACTIVE_KEY,
+  UNSCOPED_INDEX_KEY,
+  activeThreadKey,
+  chatScope,
   loadActiveThreadId,
   loadThreadIndex,
   messageText,
   migrateLegacyThread,
+  migrateUnscopedThreads,
   newThreadId,
   partText,
   readThreadBlob,
@@ -18,8 +21,11 @@ import {
   saveThreadIndex,
   searchThreads,
   snippetAround,
+  threadIndexKey,
+  threadKey,
   threadMetaFromMessages,
   threadTitle,
+  clearChatStorage,
 } from './history'
 
 function makeStorage() {
@@ -28,6 +34,10 @@ function makeStorage() {
     getItem: (k: string) => map.get(k) ?? null,
     setItem: (k: string, v: string) => void map.set(k, v),
     removeItem: (k: string) => void map.delete(k),
+    get length() {
+      return map.size
+    },
+    key: (i: number) => Array.from(map.keys())[i] ?? null,
   }
 }
 
@@ -220,32 +230,72 @@ describe('thread index + active (localStorage)', () => {
   })
 
   it('round-trips the index and active thread', () => {
-    expect(loadThreadIndex()).toEqual([])
+    expect(loadThreadIndex('b1')).toEqual([])
     const threads = [
       { id: 'a', title: 'One', createdAt: 1, lastMessageAt: 2, messageCount: 1 },
     ]
-    saveThreadIndex(threads)
-    saveActiveThreadId('a')
-    expect(loadThreadIndex()).toEqual(threads)
-    expect(loadActiveThreadId()).toBe('a')
+    saveThreadIndex('b1', threads)
+    saveActiveThreadId('b1', 'a')
+    expect(loadThreadIndex('b1')).toEqual(threads)
+    expect(loadActiveThreadId('b1')).toBe('a')
   })
 
   it('tolerates a corrupt index', () => {
-    localStorage.setItem(CHAT_INDEX_KEY, '{not json')
-    expect(loadThreadIndex()).toEqual([])
+    localStorage.setItem(threadIndexKey('b1'), '{not json')
+    expect(loadThreadIndex('b1')).toEqual([])
   })
 
   it('reads per-thread blobs through the prefixed key', () => {
     const storage = makeStorage()
-    storage.setItem(`${CHAT_PREFIX}t1`, JSON.stringify({ messages: [userMsg('1', 'hi')] }))
-    const blob = readThreadBlob('t1', storage)
+    storage.setItem(threadKey('b1', 't1'), JSON.stringify({ messages: [userMsg('1', 'hi')] }))
+    const blob = readThreadBlob('b1', 't1', storage)
     expect(blob?.messages).toHaveLength(1)
-    expect(readThreadBlob('missing', storage)).toBeNull()
-    expect(readThreadBlob('t1', makeStorage())).toBeNull()
+    expect(readThreadBlob('b1', 'missing', storage)).toBeNull()
+    expect(readThreadBlob('b1', 't1', makeStorage())).toBeNull()
   })
 
   it('produces unique thread ids', () => {
     expect(newThreadId()).not.toBe(newThreadId())
+  })
+})
+
+describe('board scoping', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('keeps one board\'s threads out of another board\'s list', () => {
+    const threads = [
+      { id: 'a', title: 'Board A chat', createdAt: 1, lastMessageAt: 2, messageCount: 1 },
+    ]
+    saveThreadIndex('board-a', threads)
+
+    expect(loadThreadIndex('board-a')).toEqual(threads)
+    expect(loadThreadIndex('board-b')).toEqual([])
+  })
+
+  it('keeps one board\'s active thread out of another board\'s', () => {
+    saveActiveThreadId('board-a', 'a')
+    expect(loadActiveThreadId('board-a')).toBe('a')
+    expect(loadActiveThreadId('board-b')).toBeNull()
+  })
+
+  it('keeps one board\'s transcript out of another board\'s', () => {
+    const storage = makeStorage()
+    storage.setItem(
+      threadKey('board-a', 't1'),
+      JSON.stringify({ messages: [userMsg('1', 'secret note')] }),
+    )
+
+    expect(readThreadBlob('board-a', 't1', storage)?.messages).toHaveLength(1)
+    expect(readThreadBlob('board-b', 't1', storage)).toBeNull()
+  })
+
+  it('namespaces every key under the board', () => {
+    expect(chatScope('board-a')).toBe(`${CHAT_PREFIX}board-a.`)
+    expect(threadIndexKey('board-a')).toBe(`${CHAT_PREFIX}board-a.index`)
+    expect(activeThreadKey('board-a')).toBe(`${CHAT_PREFIX}board-a.active`)
+    expect(threadKey('board-a', 't1')).toBe(`${CHAT_PREFIX}board-a.t1`)
   })
 })
 
@@ -258,22 +308,66 @@ describe('legacy migration', () => {
     const storage = makeStorage()
     storage.setItem(LEGACY_CHAT_KEY, JSON.stringify({ messages: [userMsg('1', 'legacy hello')] }))
 
-    const migrated = migrateLegacyThread(storage)
+    const migrated = migrateLegacyThread('b1', storage)
     expect(migrated).not.toBeNull()
     expect(migrated!.title).toBe('legacy hello')
     expect(migrated!.messageCount).toBe(1)
     expect(storage.getItem(LEGACY_CHAT_KEY)).toBeNull()
-    expect(storage.getItem(`${CHAT_PREFIX}${migrated!.id}`)).toContain('legacy hello')
+    expect(storage.getItem(threadKey('b1', migrated!.id))).toContain('legacy hello')
   })
 
   it('is a no-op when the legacy blob is missing', () => {
-    expect(migrateLegacyThread(makeStorage())).toBeNull()
+    expect(migrateLegacyThread('b1', makeStorage())).toBeNull()
   })
 
   it('is a no-op on a corrupt legacy blob', () => {
     const storage = makeStorage()
     storage.setItem(LEGACY_CHAT_KEY, 'nope')
-    expect(migrateLegacyThread(storage)).toBeNull()
+    expect(migrateLegacyThread('b1', storage)).toBeNull()
+  })
+})
+
+describe('unscoped (pre-board) thread migration', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('adopts old global conversations into the board and clears the global bucket', () => {
+    const storage = makeStorage()
+    storage.setItem(
+      UNSCOPED_INDEX_KEY,
+      JSON.stringify([
+        { id: 'old-1', title: 'Old chat', createdAt: 1, lastMessageAt: 2, messageCount: 1 },
+      ]),
+    )
+    storage.setItem(
+      `${CHAT_PREFIX}old-1`,
+      JSON.stringify({ messages: [userMsg('1', 'old content')] }),
+    )
+    storage.setItem(UNSCOPED_ACTIVE_KEY, 'old-1')
+
+    const adopted = migrateUnscopedThreads('b1', storage)
+
+    expect(adopted).toHaveLength(1)
+    expect(adopted![0].id).toBe('old-1')
+    // The transcript moved into the board's namespace...
+    expect(storage.getItem(threadKey('b1', 'old-1'))).toContain('old content')
+    expect(storage.getItem(`${CHAT_PREFIX}old-1`)).toBeNull()
+    // ...and the global bucket is gone.
+    expect(storage.getItem(UNSCOPED_INDEX_KEY)).toBeNull()
+    expect(storage.getItem(UNSCOPED_ACTIVE_KEY)).toBeNull()
+    expect(storage.getItem(activeThreadKey('b1'))).toBe('old-1')
+  })
+
+  it('is a no-op when there is no global bucket', () => {
+    expect(migrateUnscopedThreads('b1', makeStorage())).toBeNull()
+  })
+
+  it('drops a corrupt global bucket rather than failing', () => {
+    const storage = makeStorage()
+    storage.setItem(UNSCOPED_INDEX_KEY, '{not json')
+    expect(migrateUnscopedThreads('b1', storage)).toBeNull()
+    expect(storage.getItem(UNSCOPED_INDEX_KEY)).toBeNull()
   })
 })
 
@@ -287,8 +381,31 @@ describe('Titles', () => {
 
 describe('index storage keying', () => {
   it('uses namespaced keys', () => {
-    expect(CHAT_INDEX_KEY).toBe(`${CHAT_PREFIX}index`)
-    expect(CHAT_ACTIVE_KEY).toBe(`${CHAT_PREFIX}active`)
+    expect(UNSCOPED_INDEX_KEY).toBe(`${CHAT_PREFIX}index`)
+    expect(UNSCOPED_ACTIVE_KEY).toBe(`${CHAT_PREFIX}active`)
     expect(LEGACY_CHAT_KEY).toContain('khoja-board-ask')
+  })
+})
+
+describe('clearChatStorage', () => {
+  it('clears all board chat keys and legacy keys while preserving unrelated keys', () => {
+    const storage = makeStorage()
+    storage.setItem('khoja.chat.board-1.thread-1', 'data1')
+    storage.setItem('khoja.chat.board-1.index', 'data2')
+    storage.setItem('khoja.chat.board-2.active', 'data3')
+    storage.setItem('khoja.chat.board-1.approval.t1', 'data4')
+    storage.setItem('tanstack-ai:khoja-board-ask', 'legacy-data')
+    storage.setItem('theme', 'dark')
+    storage.setItem('other-key', 'keep-me')
+
+    clearChatStorage(storage)
+
+    expect(storage.getItem('khoja.chat.board-1.thread-1')).toBeNull()
+    expect(storage.getItem('khoja.chat.board-1.index')).toBeNull()
+    expect(storage.getItem('khoja.chat.board-2.active')).toBeNull()
+    expect(storage.getItem('khoja.chat.board-1.approval.t1')).toBeNull()
+    expect(storage.getItem('tanstack-ai:khoja-board-ask')).toBeNull()
+    expect(storage.getItem('theme')).toBe('dark')
+    expect(storage.getItem('other-key')).toBe('keep-me')
   })
 })

@@ -33,18 +33,24 @@ import {
 import { ArrowLeft, Plus, Settings } from 'lucide-react'
 import { AskSettings } from './AskSettings'
 import { markdownComponents } from '#/lib/markdown/components'
-import { pruneApprovals, trackApproval } from '#/lib/chat/approval-expiry'
 import {
-  CHAT_PREFIX,
+  expireApprovalsNow,
+  pruneApprovals,
+  trackApproval,
+} from '#/lib/chat/approval-expiry'
+import {
   DEFAULT_TITLE,
+  chatScope,
   loadActiveThreadId,
   loadThreadIndex,
   migrateLegacyThread,
+  migrateUnscopedThreads,
   newThreadId,
   readThreadBlob,
   saveActiveThreadId,
   saveThreadIndex,
   searchThreads,
+  threadKey,
   threadMetaFromMessages,
   type ChatSearchHit,
   type ThreadMeta,
@@ -109,6 +115,26 @@ function describeFailure(error: unknown): string {
     }
   }
   return String(error)
+}
+
+/**
+ * Returns true when the failure is likely caused by a bad provider/model
+ * configuration (wrong API key, rate limit, unknown model) rather than a
+ * transient network error — so the UI can offer an "Open settings" shortcut
+ * alongside "Try again".
+ */
+function isProviderError(error: unknown): boolean {
+  const msg = describeFailure(error).toLowerCase()
+  return (
+    msg.includes('api key') ||
+    msg.includes('rate limit') ||
+    msg.includes('429') ||
+    msg.includes('401') ||
+    msg.includes('403') ||
+    msg.includes('no ai provider') ||
+    msg.includes('model') ||
+    msg.includes('provider')
+  )
 }
 
 function summarizeToolCallOutput(name: string, parsed: unknown): string {
@@ -178,14 +204,19 @@ function makeEmptyThread(): ThreadMeta {
   }
 }
 
-/** One-time mount: load the thread index, migrating the legacy single-thread
- *  blob on first run, and never leave an index without at least one thread. */
-function initializeThreads(): ThreadMeta[] {
-  let threads = loadThreadIndex()
+/** One-time mount: load this board's thread index, migrating older unscoped
+ *  conversations and the legacy single-thread blob on first run, and never
+ *  leave an index without at least one thread. */
+function initializeThreads(boardId: string): ThreadMeta[] {
+  let threads = loadThreadIndex(boardId)
   if (threads.length === 0) {
-    const migrated = migrateLegacyThread()
-    threads = [migrated ?? makeEmptyThread()]
-    saveThreadIndex(threads)
+    // Conversations from before Ask history was board-scoped belong to the
+    // board the user was working on, so the first board opened adopts them.
+    const adopted = migrateUnscopedThreads(boardId)
+    const migrated = migrateLegacyThread(boardId)
+    threads = [...(adopted ?? []), ...(migrated ? [migrated] : [])]
+    if (threads.length === 0) threads = [makeEmptyThread()]
+    saveThreadIndex(boardId, threads)
   }
   return threads
 }
@@ -225,10 +256,11 @@ function highlight(snippet: string, query: string): React.ReactNode[] {
 /**
  * M18 — one live Ask conversation. Remounted with `key={threadId}` so each
  * thread owns its own `useChat` client and persists under its own
- * `khoja.chat.<threadId>` blob.
+ * `khoja.chat.<boardId>.<threadId>` blob.
  */
 function AskThread({
   threadId,
+  boardId,
   body,
   canSend,
   disabledReason,
@@ -238,6 +270,7 @@ function AskThread({
   onReplied,
 }: {
   threadId: string
+  boardId: string
   body: Record<string, unknown>
   canSend: boolean
   disabledReason: string | null
@@ -251,7 +284,9 @@ function AskThread({
     connection: fetchServerSentEvents('/api/chat'),
     body,
     tools: aiTools,
-    persistence: localStoragePersistence({ keyPrefix: CHAT_PREFIX }),
+    // Board-scoped: a conversation's transcript holds this board's content, so
+    // it must never be readable from another board's namespace.
+    persistence: localStoragePersistence({ keyPrefix: chatScope(boardId) }),
   })
 
   const { messages, sendMessage, interrupts, resuming, interruptErrors, error, reload } =
@@ -316,16 +351,44 @@ function AskThread({
     if (approvalInterrupts.length === 0) return
     const now = Date.now()
     pruneApprovals(
+      boardId,
       threadId,
       approvalInterrupts.map((interrupt) => interrupt.id),
     )
     for (const interrupt of approvalInterrupts) {
-      const { expired } = trackApproval(threadId, interrupt.id, { now })
+      const { expired } = trackApproval(boardId, threadId, interrupt.id, {
+        now,
+      })
       if (!expired || expiredApprovals.current.has(interrupt.id)) continue
       expiredApprovals.current.add(interrupt.id)
       interrupt.cancel()
     }
-  }, [threadId, approvalInterrupts])
+  }, [boardId, threadId, approvalInterrupts])
+
+  // If the tab closes or the thread unmounts while an approval is still
+  // pending, the server may never acknowledge a retry. Mark pending approvals
+  // expired so a later visit cancels them instead of leaving a dead card.
+  useEffect(() => {
+    if (approvalInterrupts.length === 0) return
+    const expirePending = () => {
+      expireApprovalsNow(
+        boardId,
+        threadId,
+        approvalInterrupts.map((interrupt) => interrupt.id),
+      )
+    }
+    const onPageHide = () => expirePending()
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') expirePending()
+    }
+    window.addEventListener('pagehide', onPageHide)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('pagehide', onPageHide)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      expirePending()
+    }
+  }, [boardId, threadId, approvalInterrupts])
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight })
@@ -569,6 +632,20 @@ function AskThread({
         {lastError && (
           <div className="ask-error" role="alert">
             <span className="ask-error-text">{describeFailure(lastError)}</span>
+            {isProviderError(lastError) && onOpenSettings && (
+              <p className="ask-error-hint">
+                Check your provider and model in{' '}
+                <Button
+                  type="button"
+                  variant="link"
+                  className="ask-error-settings-link"
+                  onClick={onOpenSettings}
+                >
+                  Ask settings
+                </Button>
+                .
+              </p>
+            )}
             {/* A failed run leaves no way back otherwise, and a stale pending
                 approval in particular cannot be cleared from here. */}
             <Button
@@ -613,10 +690,14 @@ function AskThread({
 
 export function AskPanel({
   onFocusBlock,
+  boardId,
 }: {
   /** Given a block id that a tool just created, pans/selects it on the canvas
    *  (used to bring freshly-drawn diagrams into view). */
   onFocusBlock?: (blockId: string) => void
+  /** The board this conversation is about. The server scopes every tool to
+   *  it, so the assistant can never read or write another board. */
+  boardId: string
 }) {
   const { data: providers = [] } = useQuery<AiProviderInfo[]>({
     queryKey: ['ask-providers'],
@@ -645,19 +726,21 @@ export function AskPanel({
   // M18 UI — provider/model live in a settings dialog, not the chat panel.
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  // M18 — thread history state
-  const [threads, setThreads] = useState<ThreadMeta[]>(initializeThreads)
+  // M18 — thread history state, scoped to this board.
+  const [threads, setThreads] = useState<ThreadMeta[]>(() =>
+    initializeThreads(boardId),
+  )
   const [activeThreadId, setActiveThreadId] = useState<string>(() => {
-    const saved = loadActiveThreadId()
-    const index = loadThreadIndex()
+    const saved = loadActiveThreadId(boardId)
+    const index = loadThreadIndex(boardId)
     if (saved && index.some((t) => t.id === saved)) return saved
     if (index[0]) {
-      saveActiveThreadId(index[0].id)
+      saveActiveThreadId(boardId, index[0].id)
       return index[0].id
     }
     const fresh = makeEmptyThread()
-    saveThreadIndex([fresh])
-    saveActiveThreadId(fresh.id)
+    saveThreadIndex(boardId, [fresh])
+    saveActiveThreadId(boardId, fresh.id)
     return fresh.id
   })
   // Landing view: chat list + search first; clicking a thread enters it.
@@ -721,7 +804,10 @@ export function AskPanel({
     markSelectionWorking({ provider: providerId, model })
   }, [providerId, model])
 
-  const body = useMemo(() => ({ provider: providerId, model }), [providerId, model])
+  const body = useMemo(
+    () => ({ provider: providerId, model, boardId }),
+    [providerId, model, boardId],
+  )
 
   const syncThread = useCallback(
     (messages: UIMessage[]) => {
@@ -748,20 +834,20 @@ export function AskPanel({
         })
         if (!changed) return prev
         next.sort((a, b) => b.lastMessageAt - a.lastMessageAt)
-        saveThreadIndex(next)
+        saveThreadIndex(boardId, next)
         return next
       })
     },
-    [activeThreadId],
+    [activeThreadId, boardId],
   )
 
   const switchTo = useCallback(
     (id: string) => {
       if (id === activeThreadId) return
-      saveActiveThreadId(id)
+      saveActiveThreadId(boardId, id)
       setActiveThreadId(id)
     },
-    [activeThreadId],
+    [activeThreadId, boardId],
   )
 
   const startNewChat = useCallback(() => {
@@ -773,11 +859,11 @@ export function AskPanel({
     const next = [fresh, ...threads].sort(
       (a, b) => b.lastMessageAt - a.lastMessageAt,
     )
-    saveThreadIndex(next)
+    saveThreadIndex(boardId, next)
     setThreads(next)
-    saveActiveThreadId(fresh.id)
+    saveActiveThreadId(boardId, fresh.id)
     setActiveThreadId(fresh.id)
-  }, [threads, activeThreadId])
+  }, [threads, activeThreadId, boardId])
 
   /** Enter a conversation from the home list/search. */
   const enterThread = useCallback(
@@ -805,31 +891,33 @@ const deleteThread = useCallback(
     if (!id) return
     setDeleteTargetId(null)
     try {
-      localStorage.removeItem(`${CHAT_PREFIX}${id}`)
+      localStorage.removeItem(threadKey(boardId, id))
     } catch {
       // best-effort
     }
     let next = threads.filter((t) => t.id !== id)
     if (next.length === 0) next = [makeEmptyThread()]
     next.sort((a, b) => b.lastMessageAt - a.lastMessageAt)
-    saveThreadIndex(next)
+    saveThreadIndex(boardId, next)
     setThreads(next)
     if (activeThreadId === id) {
       const fallback = next[0]
-      saveActiveThreadId(fallback.id)
+      saveActiveThreadId(boardId, fallback.id)
       setActiveThreadId(fallback.id)
     }
-  }, [deleteTargetId, threads, activeThreadId])
+  }, [deleteTargetId, threads, activeThreadId, boardId])
 
-  // M18 — search across every thread blob, re-run as the index or query moves.
+  // M18 — search across this board's thread blobs, re-run as the index or
+  // query moves. Scoped to the board: another board's conversations are not
+  // searchable from here.
   useEffect(() => {
     const q = query.trim()
     if (!q) {
       setHits([])
       return
     }
-    setHits(searchThreads(q, threads, (id) => readThreadBlob(id)))
-  }, [query, threads])
+    setHits(searchThreads(q, threads, (id) => readThreadBlob(boardId, id)))
+  }, [query, threads, boardId])
 
   const clearSearch = useCallback(() => {
     setQuery('')
@@ -1027,6 +1115,7 @@ const deleteThread = useCallback(
           <AskThread
             key={activeThreadId}
             threadId={activeThreadId}
+            boardId={boardId}
             body={body}
             canSend={canSend}
             disabledReason={disabledReason}

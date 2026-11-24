@@ -10,30 +10,39 @@ import {
 } from '#/db/queries.functions'
 import { LinkSchema } from '#/types/schemas'
 
-export function createLinksCollection(queryClient: QueryClient) {
+export function createLinksCollection(
+  queryClient: QueryClient,
+  boardId: string,
+) {
   return createCollection(
     queryCollectionOptions({
-      id: 'links',
-      queryKey: ['links'],
+      id: `links:${boardId}`,
+      queryKey: ['links', boardId],
       queryClient,
       schema: LinkSchema,
       getKey: (link) => link.id,
-      queryFn: async () => listLinksFn(),
+      queryFn: async () => listLinksFn({ data: { boardId } }),
       onInsert: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await insertLinkFn({ data: mutation.modified })
+          await insertLinkFn({
+            data: { boardId, link: mutation.modified },
+          })
         }
       },
       onUpdate: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
           await updateLinkFn({
-            data: { id: mutation.key, changes: mutation.changes },
+            data: {
+              boardId,
+              id: mutation.key,
+              changes: mutation.changes,
+            },
           })
         }
       },
       onDelete: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await deleteLinkFn({ data: { id: mutation.key } })
+          await deleteLinkFn({ data: { boardId, id: mutation.key } })
         }
       },
     }),

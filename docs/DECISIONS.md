@@ -26,6 +26,69 @@ rejected after discussion.
 **Consequences:** Infrastructure (auth, DB, persistence) is deferred. The canvas
 and block model must be validated before those are layered on.
 
+*Update: the deferral held until the canvas was complete (M0–M18). Auth and
+multi-board isolation are now built — see the decision below.*
+
+---
+
+## Decision: Auth layer and multi-board isolation (email + password)
+
+**Date:** 2026-10-22
+**Status:** Accepted
+
+**Context:** The canvas is finished, so the infrastructure that was deliberately
+deferred can now be layered on. The app was still a single global board: one
+set of `blocks`, `links`, `types` and `views` for everybody, and `api_keys`
+unique per *provider*, so a second person could not have their own board and
+one person's key would pay for everyone's AI calls.
+
+**Decision:** Add a self-contained auth layer and make the board a first-class
+unit of isolation.
+
+- **Accounts:** email + password. Passwords are hashed with scrypt from
+  `node:crypto` — no new dependency. A session is a random token in an httpOnly
+  cookie, stored in the database as a SHA-256 hash, so a database leak cannot be
+  replayed as a live session.
+- **Boards:** `boards` + `board_members` (roles `owner` / `editor` / `viewer`).
+  Every board-scoped table carries a `board_id`, and the child tables
+  reference their block through a composite `(block_id, board_id)` foreign key,
+  so a placement or link can never cross a board boundary.
+- **Authorisation** lives in one place: `src/lib/auth/guards.server.ts`. Every
+  board-scoped server function re-checks the caller's role, because the board id
+  arrives from the client and is therefore untrusted input.
+- **API keys are per user**, so one person's key never silently pays for
+  another person's board.
+- **The board is in the URL** (`/boards/$boardId`), and the board-scoped
+  TanStack DB collections are created per board.
+- **Ask history is board-scoped.** Conversations live in localStorage under
+  `khoja.chat.<boardId>.*` — the transcript, the thread index, the active
+  thread and the pending-approval state. A conversation carries its board's
+  blocks and tool output, and the server binds the Ask tools to whichever
+  board the request names, so keeping conversations in one global bucket would
+  let a thread started on one board stay open on another, sending the first
+  board's content back to the model alongside the second board's tools.
+- **Deleting an account does not destroy boards.** `boards.owner_id` is
+  `ON DELETE SET NULL`, not `CASCADE`: a board other people are working on
+  must survive the departure of the person who created it.
+
+**Why:** Email + password is the only mechanism that works with nothing but a
+Postgres connection configured — no mail provider, no OAuth client. Magic
+links and OAuth were rejected for that reason alone. scrypt avoids a native
+dependency in a self-hosted app.
+
+**Alternatives considered:** Magic link (needs an email provider and token
+expiry handling); OAuth (needs a client id/secret and a callback route, and
+makes local development fiddly); a dev-only header naming the user (fast to
+wire, but not an auth layer).
+
+**Consequences:** The board route moved from `/` to `/boards/$boardId`, and the
+root now forwards to the board list. Every query in the data path is
+board-scoped, and the AI tools are built per request against a single board, so
+the assistant can neither read nor write another board. Roles are enforced on
+the server; the UI additionally hides editing affordances for viewers. The
+pre-existing content is parked on an *unclaimed* board that the first account
+to register takes over, so a local install does not lose its board.
+
 ---
 
 ## Decision: Custom canvas (Canvas API + pan/zoom) rather than a canvas library

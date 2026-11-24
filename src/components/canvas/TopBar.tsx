@@ -1,4 +1,5 @@
 import ThemeToggle from '#/components/ThemeToggle'
+import { BoardSwitcher } from '#/components/boards/BoardSwitcher'
 import { FileImport } from './FileImport'
 import { JsonImport } from './JsonImport'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,10 @@ interface TopBarProps {
   onExportJson?: () => void
   onImportBoardFile?: (file: File) => void
   onExportPng?: () => void
+  /** When set, the top bar shows the board switcher for this board. */
+  boardId?: string
+  /** Viewers get the read-only board: no creation or import actions. */
+  canEdit?: boolean
 }
 
 export function TopBar({
@@ -19,6 +24,8 @@ export function TopBar({
   onExportJson,
   onImportBoardFile,
   onExportPng,
+  boardId,
+  canEdit = true,
 }: TopBarProps) {
   return (
     <header className="board-topbar">
@@ -30,8 +37,9 @@ export function TopBar({
         </div>
       </div>
       <div className="topbar-actions">
+        {boardId && <BoardSwitcher boardId={boardId} />}
         <span className="topbar-hint">V Move · H Hand · T Text · C Connect · A Assets · M Map · Ctrl+I Ask · Space pan</span>
-        {onCreateType && (
+        {canEdit && onCreateType && (
           <Button
             type="button"
             variant="outline"
@@ -43,7 +51,7 @@ export function TopBar({
             + Type
           </Button>
         )}
-        {onCreateGroup && (
+        {canEdit && onCreateGroup && (
           <Button
             type="button"
             variant="outline"
@@ -55,7 +63,9 @@ export function TopBar({
             File Group
           </Button>
         )}
-        {onPickFiles && <FileImport onPick={onPickFiles} label="Place files" />}
+        {canEdit && onPickFiles && (
+          <FileImport onPick={onPickFiles} label="Place files" />
+        )}
         {onExportJson && (
           <Button
             type="button"
@@ -68,7 +78,9 @@ export function TopBar({
             Export
           </Button>
         )}
-        {onImportBoardFile && <JsonImport onPick={onImportBoardFile} label="Import" />}
+        {canEdit && onImportBoardFile && (
+          <JsonImport onPick={onImportBoardFile} label="Import" />
+        )}
         {onExportPng && (
           <Button
             type="button"

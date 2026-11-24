@@ -12,7 +12,10 @@ import {
   resolveAdapter,
   type AiProviderId,
 } from '#/lib/ai/providers.server'
-import { aiServerTools } from '#/lib/ai/tools.server'
+import { createAiServerTools } from '#/lib/ai/tools.server'
+import { getSessionUser } from '#/lib/auth/session.server'
+import { getBoardMembership } from '#/lib/auth/guards.server'
+import { canEditBoard } from '#/lib/boards/roles'
 
 /**
  * Reads a whitelisted string field out of the request.
@@ -20,9 +23,9 @@ import { aiServerTools } from '#/lib/ai/tools.server'
  * The chat client does not send provider/model at the top level: `useChat`'s
  * `body` is merged into the AG-UI `RunAgentInput.forwardedProps` field (and
  * mirrored under the legacy `data` field). Reading only `raw.provider` meant the
- * user's selection was silently discarded and the server always fell back to the
- * first available provider — which happened to be correct by luck when there was
- * only one usable provider, and wrong the moment a second was configured.
+ * user's selection was silently discarded and the server always fell back to
+ * the first available provider — which happened to be correct by luck when there
+ * was only one usable provider, and wrong the moment a second was configured.
  *
  * Deliberately allowlisted field-by-field rather than spreading
  * `forwardedProps`, which is client-controlled and could otherwise be used to
@@ -43,11 +46,14 @@ function readClientField(
   return undefined
 }
 
-async function providerFor(raw: Record<string, unknown>): Promise<{
+async function providerFor(
+  raw: Record<string, unknown>,
+  userId: string,
+): Promise<{
   provider: AiProviderId
   model: string
 }> {
-  const providers = await listAiProviders()
+  const providers = await listAiProviders(userId)
   const requested = readClientField(raw, 'provider') as AiProviderId | null
 
   let provider: AiProviderId | null = null
@@ -78,11 +84,35 @@ export const Route = createFileRoute('/api/chat')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // The assistant is bound to one board, and that board is decided here —
+        // from the session and the membership table — not from the request
+        // body. The body only says which board the user *asked* about.
+        const user = await getSessionUser()
+        if (!user) {
+          return Response.json(
+            { error: 'Sign in to use Ask.' },
+            { status: 401 },
+          )
+        }
+
         let raw: Record<string, unknown>
         try {
           raw = (await request.json()) as Record<string, unknown>
         } catch {
           return Response.json({ error: 'Invalid request body.' }, { status: 400 })
+        }
+
+        const boardId = readClientField(raw, 'boardId')
+        if (!boardId) {
+          return Response.json(
+            { error: 'No board selected for this conversation.' },
+            { status: 400 },
+          )
+        }
+
+        const membership = await getBoardMembership(boardId, user.id)
+        if (!membership) {
+          return Response.json({ error: 'Board not found.' }, { status: 404 })
         }
 
         let params
@@ -94,7 +124,7 @@ export const Route = createFileRoute('/api/chat')({
 
         let config: { provider: AiProviderId; model: string }
         try {
-          config = await providerFor(raw)
+          config = await providerFor(raw, user.id)
         } catch (error) {
           return Response.json(
             { error: error instanceof Error ? error.message : 'Bad request.' },
@@ -105,7 +135,11 @@ export const Route = createFileRoute('/api/chat')({
         let adapter
         let modelOptions: Record<string, unknown>
         try {
-          const resolved = await resolveAdapter(config.provider, config.model)
+          const resolved = await resolveAdapter(
+            config.provider,
+            config.model,
+            user.id,
+          )
           adapter = resolved.adapter
           modelOptions = resolved.modelOptions
         } catch (error) {
@@ -115,6 +149,12 @@ export const Route = createFileRoute('/api/chat')({
           )
         }
 
+        // A viewer gets the read-only tool only — the assistant cannot write
+        // to a board its owner did not let them change.
+        const tools = createAiServerTools(boardId, {
+          canEdit: canEditBoard(membership.role),
+        })
+
         const stream = chat({
           adapter,
           messages: params.messages,
@@ -122,7 +162,7 @@ export const Route = createFileRoute('/api/chat')({
           runId: params.runId,
           ...(params.parentRunId ? { parentRunId: params.parentRunId } : {}),
           ...(params.resume ? { resume: params.resume } : {}),
-          tools: aiServerTools,
+          tools,
           systemPrompts: [AI_SYSTEM_PROMPT],
           agentLoopStrategy: maxIterations(8),
           // Always explicit, and spelled per-provider by `resolveAdapter`. Left

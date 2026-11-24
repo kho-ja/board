@@ -1,0 +1,56 @@
+# Wayfinder Map — polish & harden (feat/auth-and-multi-board)
+
+## Destination
+
+Improve the existing auth and multi-board experience through targeted polish and hardening — clearer user feedback, smoother loading/empty states, sensible validation, and security hardening — until the rough edges identified are closed or accepted.
+
+## Notes
+
+- Target audience: all users of the Kho-ja Board app (new and existing accounts)
+- Success criteria: users always see clear, actionable feedback; loading states are smooth; validation is correct; system stays performant.
+- Scope: all existing features (auth, board management, Ask AI, sharing, persistence).
+
+## Decisions so far
+
+- (Ticket resolutions are appended here as they close; see tickets/ folder.)
+
+## Not yet specified
+
+- None — the polish frontier is fully charted from the survey.
+
+## Out of scope
+
+- New features (real-time collaboration, enhanced AI, public package release prep).
+- Major architectural rewrites.
+
+---
+
+## Tickets
+
+Status legend: `open`, `in-progress`, `closed`. Frontier = open, unclaimed tickets with no blockers ahead of them.
+
+1. [Login/signup error surfacing](.wayfinder/tickets/01-login-error-surfacing.md) — closed — task — smallest, high user-visible impact
+2. [Board loader silent redirect on missing board](.wayfinder/tickets/02-board-loader-redirect.md) — closed — task — trivial
+3. [Board list stale data / no skeleton](.wayfinder/tickets/03-board-list-stale-data.md) — closed — task — small
+4. [Cookie security (`__Host-`, `secure`)](.wayfinder/tickets/04-cookie-security.md) — closed — task — small
+5. [Sign-out client-cache cleanup](.wayfinder/tickets/05-signout-cache-leak.md) — closed — task — small
+6. [AskPanel retry after bad provider/model](.wayfinder/tickets/06-askpanel-retry.md) — closed — task — small
+7. [Share dialog role validation](.wayfinder/tickets/07-share-validation.md) — open — task — small
+8. [SchemaCreator focus restoration](.wayfinder/tickets/08-schema-creator-focus.md) — open — task — trivial
+9. [Session prune index](.wayfinder/tickets/09-session-prune-index.md) — open — task — small infra
+10. [Claim unclaimed board concurrency idempotency](.wayfinder/tickets/10-claim-unclaimed-board.md) — open — task — small
+11. [Board members list viewer access](.wayfinder/tickets/11-board-members-viewer.md) — open — task — trivial
+12. [Devtools gated to dev](.wayfinder/tickets/12-devtools-production.md) — open — task — small
+13. [Schema type name length validation](.wayfinder/tickets/13-schema-name-length.md) — open — task — trivial
+14. [Login mode toggle `aria-pressed`](.wayfinder/tickets/14-login-aria-pressed.md) — open — task — trivial
+15. [AskPanel approval cleanup after failed run](.wayfinder/tickets/15-askpanel-approval.md) — open — task — small
+
+## Resolutions log
+
+- 2026-10-26 · Login/signup error surfacing — **resolved** (`.wayfinder/tickets/01-login-error-surfacing.md` closed). Specific actionable error now shown on server/network failure; generic fallback retained for unexpected empty errors.
+- 2026-11-17 · Board loader silent redirect on missing board — **resolved** (`.wayfinder/tickets/02-board-loader-redirect.md` closed). Loader now redirects to `/boards?error=board-not-found`; the list page shows "That board could not be found, or you do not have access to it." and strips the param from the URL. Chose the ticket's persistent-banner wording over the 404-vs-permission distinction — the server-side split remains unimplemented and was deliberately left for a future decision.
+- 2026-11-19 · Board list stale data / loading skeleton — **resolved** (`.wayfinder/tickets/03-board-list-stale-data.md` closed). List now renders skeleton cards during `isFetching` instead of stale data with a "Loading boards…" text only; extraction to `BoardList` component with tests. Code review (Standards: clean, 3 minor judgement-call smells; Spec: compliant, minor creep).
+- 2026-11-18 · Board list stale data / no skeleton — **resolved** (`c9a364a`, `.wayfinder/tickets/03-board-list-stale-data.md` closed). Extracted `<BoardList />` in `src/components/boards/BoardList.tsx` rendering skeleton cards during active query fetch (`isFetching`) rather than stale boards; empty and populated states preserved; verified by component unit tests in `src/components/boards/BoardList.test.tsx`.
+- 2026-11-18 · Cookie security (`__Host-`, `secure`) — **resolved** (`f70774a`, `.wayfinder/tickets/04-cookie-security.md` closed). Configured session cookie with `__Host-` prefix in production (`sameSite: 'none'`, `secure: true`, `path: '/'`); maintained `kj_session` with `secure: false` and `lax` same-site in dev over plain HTTP; verified by unit tests in `src/lib/auth/session.server.test.ts`.
+- 2026-11-18 · Sign-out client-cache cleanup — **resolved** (`234b579`, `.wayfinder/tickets/05-signout-cache-leak.md` closed). Added `clearChatStorage` for all `khoja.chat.<boardId>.*` and legacy keys, `clearCollectionsCache` for live collections, and centralized `signOut` in `src/lib/auth/auth.client.ts` guaranteeing client cache cleanup on logout; verified by unit tests in `src/lib/auth/auth.client.test.ts` and `src/lib/chat/history.test.ts`.
+- 2026-11-19 · AskPanel retry after streaming failure surfaces provider/model — **resolved** (`104006f`, `.wayfinder/tickets/06-askpanel-retry.md` closed). Error state now surfaces the failure with a provider/model hint and an "Ask settings" shortcut alongside the existing "Try again"; code review (Standards: no hard violations; minor style-registration/terminology findings; Spec: compliant with minor caveats).
