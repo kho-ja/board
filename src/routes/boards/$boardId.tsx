@@ -313,8 +313,12 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
 
   const [schemaCreatorOpen, setSchemaCreatorOpen] = useState(false)
   const [schemaToEdit, setSchemaToEdit] = useState<SchemaDef | null>(null)
+  const schemaCreatorTriggerRef = useRef<HTMLElement | null>(null)
 
   const handleOpenSchemaCreator = useCallback((schema?: SchemaDef) => {
+    const active = document.activeElement
+    schemaCreatorTriggerRef.current =
+      active instanceof HTMLElement ? active : null
     setSchemaToEdit(schema ?? null)
     setSchemaCreatorOpen(true)
   }, [])
@@ -322,6 +326,13 @@ function Board({ blocks, placements, memberships, links, unplaced, types, views,
   const handleCloseSchemaCreator = useCallback(() => {
     setSchemaCreatorOpen(false)
     setSchemaToEdit(null)
+    const trigger = schemaCreatorTriggerRef.current
+    schemaCreatorTriggerRef.current = null
+    if (trigger?.isConnected) {
+      requestAnimationFrame(() => {
+        trigger.focus()
+      })
+    }
   }, [])
 
   const handleSaveSchema = useCallback(
