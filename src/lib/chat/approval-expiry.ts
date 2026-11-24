@@ -110,7 +110,7 @@ export function trackApproval(
   const map = readMap(boardId, threadId, storage)
   const known = map[interruptId]
   if (typeof known === 'number') {
-    return { firstSeen: known, expired: now - known >= ttl }
+    return { firstSeen: known, expired: known === 0 || now - known >= ttl }
   }
   map[interruptId] = now
   writeMap(boardId, threadId, map, storage)
@@ -141,4 +141,32 @@ export function pruneApprovals(
   }
   if (Object.keys(map).length !== Object.keys(next).length) changed = true
   if (changed) writeMap(boardId, threadId, next, storage)
+}
+
+/**
+ * Force pending approvals to be treated as expired on the next observation.
+ *
+ * Used when a run/tab is abandoned before the server can acknowledge the
+ * approval (for example on unexpected tab close): the interrupt card may remain
+ * in persisted chat state, but this ensures the client will cancel it as stale
+ * instead of retrying a dead run indefinitely.
+ */
+export function expireApprovalsNow(
+  boardId: string,
+  threadId: string,
+  liveIds: Iterable<string>,
+  options: { storage?: ApprovalSeenStorage } = {},
+): void {
+  const storage = options.storage ?? defaultStorage()
+  const map = readMap(boardId, threadId, storage)
+  const live = [...liveIds]
+  if (live.length === 0) return
+  let changed = false
+  for (const id of live) {
+    if (map[id] !== 0) {
+      map[id] = 0
+      changed = true
+    }
+  }
+  if (changed) writeMap(boardId, threadId, map, storage)
 }
