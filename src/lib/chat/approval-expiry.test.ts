@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   APPROVAL_TTL_MS,
   approvalSeenKey,
+  expireApprovalsNow,
   pruneApprovals,
   trackApproval,
 } from './approval-expiry'
@@ -147,5 +148,21 @@ describe('approval expiry', () => {
     expect(storage.raw.get(approvalSeenKey(BOARD, THREAD))).toBe('{}')
     const fresh = trackApproval(BOARD, THREAD, 'brand-new', { now: 4_000, storage })
     expect(fresh.expired).toBe(false)
+  })
+
+  it('marks live approvals as expired immediately for abandon-on-close cleanup', () => {
+    const storage = makeStorage()
+    trackApproval(BOARD, THREAD, INTERRUPT, { now: 10_000, storage })
+    trackApproval(BOARD, THREAD, 'approval_call_43', { now: 20_000, storage })
+
+    expireApprovalsNow(BOARD, THREAD, [INTERRUPT], { storage })
+
+    expect(
+      trackApproval(BOARD, THREAD, INTERRUPT, { now: 10_001, storage }).expired,
+    ).toBe(true)
+    expect(
+      trackApproval(BOARD, THREAD, 'approval_call_43', { now: 20_001, storage })
+        .expired,
+    ).toBe(false)
   })
 })

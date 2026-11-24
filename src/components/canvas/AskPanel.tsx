@@ -33,7 +33,11 @@ import {
 import { ArrowLeft, Plus, Settings } from 'lucide-react'
 import { AskSettings } from './AskSettings'
 import { markdownComponents } from '#/lib/markdown/components'
-import { pruneApprovals, trackApproval } from '#/lib/chat/approval-expiry'
+import {
+  expireApprovalsNow,
+  pruneApprovals,
+  trackApproval,
+} from '#/lib/chat/approval-expiry'
 import {
   DEFAULT_TITLE,
   chatScope,
@@ -358,6 +362,31 @@ function AskThread({
       if (!expired || expiredApprovals.current.has(interrupt.id)) continue
       expiredApprovals.current.add(interrupt.id)
       interrupt.cancel()
+    }
+  }, [boardId, threadId, approvalInterrupts])
+
+  // If the tab closes or the thread unmounts while an approval is still
+  // pending, the server may never acknowledge a retry. Mark pending approvals
+  // expired so a later visit cancels them instead of leaving a dead card.
+  useEffect(() => {
+    if (approvalInterrupts.length === 0) return
+    const expirePending = () => {
+      expireApprovalsNow(
+        boardId,
+        threadId,
+        approvalInterrupts.map((interrupt) => interrupt.id),
+      )
+    }
+    const onPageHide = () => expirePending()
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') expirePending()
+    }
+    window.addEventListener('pagehide', onPageHide)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('pagehide', onPageHide)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      expirePending()
     }
   }, [boardId, threadId, approvalInterrupts])
 
