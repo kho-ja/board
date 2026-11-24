@@ -43,7 +43,12 @@ export const sessions = pgTable(
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
-  (t) => [index('sessions_user_idx').on(t.userId)],
+  (t) => [
+    index('sessions_user_idx').on(t.userId),
+    // `pruneExpiredSessions` deletes by expiry time; without this index it has
+    // to scan the whole table as expired rows accumulate.
+    index('sessions_expires_at_idx').on(t.expiresAt),
+  ],
 )
 
 export const boards = pgTable(
