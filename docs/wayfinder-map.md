@@ -35,15 +35,15 @@ Status legend: `open`, `in-progress`, `closed`. Frontier = open, unclaimed ticke
 4. [Cookie security (`__Host-`, `secure`)](.wayfinder/tickets/04-cookie-security.md) — closed — task — small
 5. [Sign-out client-cache cleanup](.wayfinder/tickets/05-signout-cache-leak.md) — closed — task — small
 6. [AskPanel retry after bad provider/model](.wayfinder/tickets/06-askpanel-retry.md) — closed — task — small
-7. [Share dialog role validation](.wayfinder/tickets/07-share-validation.md) — open — task — small
-8. [SchemaCreator focus restoration](.wayfinder/tickets/08-schema-creator-focus.md) — open — task — trivial
-9. [Session prune index](.wayfinder/tickets/09-session-prune-index.md) — open — task — small infra
-10. [Claim unclaimed board concurrency idempotency](.wayfinder/tickets/10-claim-unclaimed-board.md) — open — task — small
-11. [Board members list viewer access](.wayfinder/tickets/11-board-members-viewer.md) — open — task — trivial
-12. [Devtools gated to dev](.wayfinder/tickets/12-devtools-production.md) — open — task — small
-13. [Schema type name length validation](.wayfinder/tickets/13-schema-name-length.md) — open — task — trivial
-14. [Login mode toggle `aria-pressed`](.wayfinder/tickets/14-login-aria-pressed.md) — open — task — trivial
-15. [AskPanel approval cleanup after failed run](.wayfinder/tickets/15-askpanel-approval.md) — open — task — small
+7. [Share dialog role validation](.wayfinder/tickets/07-share-validation.md) — closed — task — small
+8. [SchemaCreator focus restoration](.wayfinder/tickets/08-schema-creator-focus.md) — closed — task — trivial
+9. [Session prune index](.wayfinder/tickets/09-session-prune-index.md) — closed — task — small infra
+10. [Claim unclaimed board concurrency idempotency](.wayfinder/tickets/10-claim-unclaimed-board.md) — closed — task — small
+11. [Board members list viewer access](.wayfinder/tickets/11-board-members-viewer.md) — closed — task — trivial
+12. [Devtools gated to dev](.wayfinder/tickets/12-devtools-production.md) — closed — task — small
+13. [Schema type name length validation](.wayfinder/tickets/13-schema-name-length.md) — closed — task — trivial
+14. [Login mode toggle `aria-pressed`](.wayfinder/tickets/14-login-aria-pressed.md) — closed — task — trivial
+15. [AskPanel approval cleanup after failed run](.wayfinder/tickets/15-askpanel-approval.md) — closed — task — small
 
 ## Resolutions log
 
@@ -54,3 +54,12 @@ Status legend: `open`, `in-progress`, `closed`. Frontier = open, unclaimed ticke
 - 2026-11-18 · Cookie security (`__Host-`, `secure`) — **resolved** (`f70774a`, `.wayfinder/tickets/04-cookie-security.md` closed). Configured session cookie with `__Host-` prefix in production (`sameSite: 'none'`, `secure: true`, `path: '/'`); maintained `kj_session` with `secure: false` and `lax` same-site in dev over plain HTTP; verified by unit tests in `src/lib/auth/session.server.test.ts`.
 - 2026-11-18 · Sign-out client-cache cleanup — **resolved** (`234b579`, `.wayfinder/tickets/05-signout-cache-leak.md` closed). Added `clearChatStorage` for all `khoja.chat.<boardId>.*` and legacy keys, `clearCollectionsCache` for live collections, and centralized `signOut` in `src/lib/auth/auth.client.ts` guaranteeing client cache cleanup on logout; verified by unit tests in `src/lib/auth/auth.client.test.ts` and `src/lib/chat/history.test.ts`.
 - 2026-11-19 · AskPanel retry after streaming failure surfaces provider/model — **resolved** (`104006f`, `.wayfinder/tickets/06-askpanel-retry.md` closed). Error state now surfaces the failure with a provider/model hint and an "Ask settings" shortcut alongside the existing "Try again"; code review (Standards: no hard violations; minor style-registration/terminology findings; Spec: compliant with minor caveats).
+- 2026-11-24 · Share dialog role validation — **resolved** (`6b6dfdf`, `.wayfinder/tickets/07-share-validation.md` closed, issue #6 / PR #15). Added `isBoardRole` client/server validation; share dialog rejects unknown/non-shareable roles with `role="alert"` "Unknown role."; `setMemberRoleFn` rejects unknown roles.
+- 2026-11-24 · SchemaCreator focus restoration — **resolved** (`2238b86`, `.wayfinder/tickets/08-schema-creator-focus.md` closed, issue #7 / PR #16). Captures active trigger before open and restores focus on close for keyboard navigation.
+- 2026-11-24 · Session prune index on expiresAt — **resolved** (`d02991b`, `.wayfinder/tickets/09-session-prune-index.md` closed, issue #8 / PR #17). Added `sessions_expires_at_idx` in schema and `drizzle/0002_session_expires_at_idx.sql`; apply via normal migration flow.
+- 2026-11-24 · Claim unclaimed board concurrency idempotency — **resolved** (`485a233`, `.wayfinder/tickets/10-claim-unclaimed-board.md` closed, issue #9 / PR #18). `claimUnclaimedBoard` now claims in a transaction with conditional owner update and conflict-safe owner membership insert.
+- 2026-11-24 · Board members list viewer access — **resolved** (`f70ea47`, `.wayfinder/tickets/11-board-members-viewer.md` closed, issue #10 / PR #19). `listBoardMembersFn` requires editor-level board access; viewers no longer receive full member roster/emails.
+- 2026-11-24 · Devtools gated to non-production env — **resolved** (`527e880`, `.wayfinder/tickets/12-devtools-production.md` closed, issue #11 / PR #20). Root document mounts TanStack devtools only when `process.env.NODE_ENV !== 'production'`.
+- 2026-11-24 · Schema type name length validation — **resolved** (`2c1c082`, `.wayfinder/tickets/13-schema-name-length.md` closed, issue #12 / PR #21). Capped SchemaCreator type names at 64 chars and normalized/capped board names server-side/client-side; scope covers `renameBoardFn` but no dedicated board-rename UI is wired.
+- 2026-11-24 · Login mode toggle `aria-pressed` — **resolved** (`8bd40d3`, `.wayfinder/tickets/14-login-aria-pressed.md` closed, issue #13 / PR #22). Sign-in/sign-up toggle buttons expose `aria-pressed={mode === value}`.
+- 2026-11-24 · AskPanel approval cleanup on failed run/tab close — **resolved** (`f985be4`, `.wayfinder/tickets/15-askpanel-approval.md` closed, issue #14 / PR #23). Pending approvals are marked expired on hide/close/unmount and canceled on next observation; abandon-on-close coverage added.
