@@ -23,7 +23,7 @@ export const Route = createFileRoute('/login')({
   component: LoginPage,
 })
 
-function LoginPage() {
+export function LoginPage() {
   const navigate = useNavigate()
   const search = Route.useSearch()
 
@@ -80,6 +80,7 @@ function LoginPage() {
               <button
                 key={value}
                 type="button"
+                aria-pressed={mode === value}
                 onClick={() => {
                   setMode(value)
                   setError(null)
