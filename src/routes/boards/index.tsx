@@ -163,6 +163,7 @@ function BoardsPage() {
               placeholder="New board name"
               className="w-48"
               aria-label="New board name"
+              maxLength={64}
             />
             <Button type="submit" disabled={pending || !newName.trim()}>
               New board

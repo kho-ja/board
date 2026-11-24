@@ -25,6 +25,13 @@ import {
  * touches a *particular* board checks that the caller owns it.
  */
 
+export const MAX_BOARD_NAME_LENGTH = 64
+
+function normalizeBoardName(name: string): string {
+  const trimmed = name.trim().slice(0, MAX_BOARD_NAME_LENGTH)
+  return trimmed || 'Untitled board'
+}
+
 export const listBoardsFn = createServerFn({ method: 'GET' }).handler(
   async () => {
     const user = await requireUser()
@@ -36,14 +43,14 @@ export const createBoardFn = createServerFn({ method: 'POST' })
   .validator((input: { name: string }) => input)
   .handler(async ({ data }) => {
     const user = await requireUser()
-    return await createBoard(user.id, data.name)
+    return await createBoard(user.id, normalizeBoardName(data.name ?? ''))
   })
 
 export const renameBoardFn = createServerFn({ method: 'POST' })
   .validator((input: { boardId: string; name: string }) => input)
   .handler(async ({ data }) => {
     await requireBoardOwner(data.boardId)
-    await renameBoard(data.boardId, data.name)
+    await renameBoard(data.boardId, normalizeBoardName(data.name ?? ''))
     return { ok: true }
   })
 
